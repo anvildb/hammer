@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import { useState, useEffect } from "react";
 import { GraphViewer } from "~/components/graph/graph-viewer";
 import type { GraphData } from "~/components/graph/types";

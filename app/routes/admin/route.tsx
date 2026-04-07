@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import { useState, useEffect, useCallback } from "react";
 import { UserManagement } from "~/components/admin/user-management";
 import { RoleManagement } from "~/components/admin/role-management";

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import { remixRoutesOptionAdapter } from "@react-router/remix-routes-option-adapter";
 import type { RouteConfig } from "@react-router/dev/routes";
 import { flatRoutes } from "remix-flat-routes";

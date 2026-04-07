@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 /** Shared types for settings & preferences. */
 
 import type { LayoutAlgorithm } from "~/components/graph/types";

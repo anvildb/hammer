@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import { useState, useEffect, type ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./topbar";

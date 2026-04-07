@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import type { MonitorData } from "./types";
 import { ActiveQueries } from "./active-queries";
 import { StoreSizes } from "./store-sizes";

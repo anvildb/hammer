@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import { useState, useEffect } from "react";
 import { SchemaBrowser } from "~/components/schema/schema-browser";
 import type { SchemaData } from "~/components/schema/types";

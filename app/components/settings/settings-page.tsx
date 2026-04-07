@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
+// Author: Benjamin C. Tehan
 import { useState, useEffect, useCallback } from "react";
 import type { UserSettings, ConnectionProfile } from "./types";
 import type { ResultViewMode } from "~/components/results/types";

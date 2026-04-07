@@ -1,5 +1,8 @@
 {
-  "name": "browser",
+  "name": "hammer",
+  "description": "Web-based management UI for Anvil DB",
+  "author": "Benjamin C. Tehan",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {

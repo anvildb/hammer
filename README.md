@@ -1,87 +1,79 @@
-# Welcome to React Router!
+# Hammer
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Web-based management UI for [Anvil DB](https://anvildb.com). Query your graph, visualize relationships, manage documents, configure security, and administer users — all from the browser.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+## Pages
 
-## Features
+| Page | Description |
+|------|-------------|
+| **Cypher** | Query editor with table, JSON, graph, and plan result views |
+| **GraphQL** | Playground with introspection and data views |
+| **Graph** | Interactive force-directed canvas with focus mode, neighbor orbit, lasso select, minimap, and PNG/SVG export |
+| **Schema** | Browse labels, relationship types, property keys, indexes, and constraints |
+| **Documents** | Collection CRUD, document browsing with pagination, JSON editor, sync rule management |
+| **Policies** | Create and manage row-level security policies, enable/disable RLS, policy simulator |
+| **Functions** | Create, edit, test, and manage stored Cypher functions |
+| **Triggers** | Create and manage event-driven triggers with activity log and dependency analysis |
+| **Import** | Paste or upload Cypher script files with node/relationship creation counts |
+| **Monitor** | Real-time server stats, slow query log, event log |
+| **Admin** | User and role management, event log explorer, alerts panel |
+| **Settings** | Theme, default result view, editor preferences, graph defaults, connection profiles |
+| **Help** | Built-in documentation and reference |
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+## Graph Canvas
 
-## Getting Started
+The graph visualization uses D3.js force simulation with multiple layout options:
 
-### Installation
+- **Force-directed** — default physics-based layout
+- **Hierarchical** — layered by in-degree
+- **Circular** — nodes arranged in a circle
+- **Grid** — evenly spaced grid
 
-Install the dependencies:
+**Focus mode** — click a node to pin it and orbit its direct connections in an evenly-spaced circle. Connected edges and labels highlight in yellow. Non-neighbor labels are hidden and nodes outside the orbit are pushed to the periphery. Click empty space to deselect and restore the normal layout.
+
+**Interactions** — drag to move nodes, shift+drag for lasso selection, double-click to expand neighbors, right-click for context menus (inspect, edit, expand, hide, delete), scroll to zoom, minimap for navigation.
+
+## Security
+
+- Non-admin users cannot see or access Admin, Policies, Functions, or Triggers pages
+- Schema dropdown only shows `auth` for admin users
+- `auth.*` document collections are hidden from non-admin users
+- All restrictions are enforced both client-side (hidden UI) and server-side (403 Forbidden)
+
+## Configuration
+
+Hammer connects to an Anvil DB instance via HTTP. The server URL is configured in the connection context (default: `http://localhost:7474`).
+
+Authentication is required. On first load, Hammer presents a login screen. JWT tokens are stored in localStorage and automatically refreshed on 401 responses.
+
+## Development
 
 ```bash
 npm install
-```
-
-### Development
-
-Start the development server with HMR:
-
-```bash
 npm run dev
 ```
 
-Your application will be available at `http://localhost:5173`.
+Runs at `http://localhost:5175` with hot module replacement.
 
-## Building for Production
-
-Create a production build:
+## Production Build
 
 ```bash
 npm run build
 ```
 
-## Deployment
+Output in `build/` — deploy the `client/` and `server/` directories to any Node.js host or container.
 
-### Docker Deployment
+## Tech Stack
 
-To build and run using Docker:
+- React Router 7
+- TypeScript
+- Tailwind CSS v4
+- D3.js (graph visualization)
 
-```bash
-docker build -t my-app .
+## Author
 
-# Run the container
-docker run -p 3000:3000 my-app
-```
+Benjamin C. Tehan
 
-The containerized application can be deployed to any platform that supports Docker, including:
+## License
 
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+MIT License. Copyright (c) 2026 Devforge Pty Ltd.
