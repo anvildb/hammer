@@ -430,7 +430,7 @@ export function GraphCanvas({
             const isFocusEdge = focusNodeId != null && (src.id === focusNodeId || tgt.id === focusNodeId);
 
             return (
-              <g key={edge.id}>
+              <g key={edge.id} style={focusNodeId && !isFocusEdge ? { opacity: 0.2 } : undefined}>
                 <line
                   x1={sx}
                   y1={sy}
@@ -480,8 +480,10 @@ export function GraphCanvas({
             const isSelected = selectedNodes.has(node.id);
             const isNeighbor = neighborIds.has(node.id);
 
+            const dimmed = focusNodeId != null && !isSelected && !isNeighbor;
+
             return (
-              <g key={node.id}>
+              <g key={node.id} style={dimmed ? { opacity: 0.5 } : undefined}>
                 {/* Neighbor highlight ring */}
                 {isNeighbor && !isSelected && (
                   <circle cx={nx} cy={ny} r={r + 4} fill="none" stroke="#facc15" strokeWidth={1.5} strokeDasharray="3 2" />
