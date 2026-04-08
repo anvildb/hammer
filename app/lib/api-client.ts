@@ -433,6 +433,9 @@ export class ApiClient {
         throw new ApiError(response.status, response.statusText, text);
       }
 
+      if (response.status === 204 || response.headers.get("content-length") === "0") {
+        return undefined as T;
+      }
       return (await response.json()) as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;
