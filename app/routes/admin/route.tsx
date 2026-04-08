@@ -197,7 +197,15 @@ export default function AdminRoute() {
               }
             }}
             onEditUser={() => {}}
-            onDeleteUser={() => {}}
+            onDeleteUser={async (username) => {
+              if (!confirm(`Delete user "${username}"? This will also remove the :User node from the graph.`)) return;
+              try {
+                await client.deleteDocument("auth.users", username);
+                setUsers((prev) => prev.filter((u) => u.username !== username));
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
           />
         )}
         {activeTab === "roles" && (
