@@ -140,7 +140,7 @@ export default function DocumentsRoute() {
       const filtered = rules.filter((r) => {
         const coll = String(r.collection ?? "");
         if (selectedSchema === "auth") return coll.startsWith("auth.");
-        return !coll.includes(".");
+        return !coll.startsWith("auth.");
       });
       setSyncRules(filtered);
     } catch {
@@ -411,12 +411,28 @@ export default function DocumentsRoute() {
                       {rule.include && rule.include !== "*" ? `include=${String(rule.include)}` : "(all props)"}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDropSyncRule(rule.id)}
-                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 px-1 flex-shrink-0 transition-opacity"
-                  >
-                    Drop
-                  </button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        const include = rule.include && rule.include !== "*" ? ` INCLUDE ${String(rule.include)}` : "";
+                        const query = `SYNC LABEL ${String(rule.label)} TO COLLECTION ${String(rule.collection)} KEY ${String(rule.key_property)}${include}`;
+                        navigator.clipboard.writeText(query);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1 transition-opacity"
+                      title="Copy SYNC LABEL statement"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                        <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
+                        <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDropSyncRule(rule.id)}
+                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 px-1 transition-opacity"
+                    >
+                      Drop
+                    </button>
+                  </div>
                 </div>
               ))}
 

@@ -246,8 +246,23 @@ export default function TriggersRoute() {
                         !t.enabled ? "opacity-50" : ""
                       }`}
                     >
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {t.name}
+                      <td className="px-3 py-2 font-mono text-xs group">
+                        <span className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              const query = `CREATE TRIGGER ${t.name}\n  ${t.timing} ${t.event} ON ${t.target}${t.priority !== 100 ? ` PRIORITY ${t.priority}` : ""}\n  FOR EACH ROW AS {\n    ${t.body.trim().split("\n").join("\n    ")}\n  }`;
+                              navigator.clipboard.writeText(query);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 transition-opacity shrink-0"
+                            title="Copy CREATE TRIGGER statement"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                              <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
+                              <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
+                            </svg>
+                          </button>
+                          <span>{t.name}</span>
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-xs">
                         <span

@@ -355,7 +355,21 @@ function EventLogExplorer({
             <tbody>
               {entries.map((evt) => (
                 <tr key={evt.id} className={`border-b border-zinc-800/50 hover:bg-zinc-900/50 ${!evt.success ? "bg-red-950/20" : ""}`}>
-                  <td className="px-3 py-1.5 text-xs text-zinc-500 font-mono">{evt.id}</td>
+                  <td className="px-3 py-1.5 text-xs text-zinc-500 font-mono group">
+                    <span className="inline-flex items-center gap-1.5">
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(evt.name); }}
+                        className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 transition-opacity shrink-0"
+                        title="Copy name to clipboard"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                          <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
+                          <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
+                        </svg>
+                      </button>
+                      <span>{evt.id}</span>
+                    </span>
+                  </td>
                   <td className="px-3 py-1.5 text-xs text-zinc-400 font-mono whitespace-nowrap">{new Date(evt.timestamp).toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-xs">
                     <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${
