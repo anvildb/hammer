@@ -534,14 +534,25 @@ function TriggersSection() {
       </P>
 
       <H2>CREATE TRIGGER</H2>
-      <Code>{`-- After insert on a collection
+      <Code>{`-- After insert: auto-create a profile (upsert for idempotency)
 CREATE TRIGGER create_profile
   AFTER INSERT ON COLLECTION auth.users
   FOR EACH ROW AS {
-    CREATE DOCUMENT IN profiles NEW.username {
+    UPSERT DOCUMENT IN profiles NEW.id {
+      id: NEW.id,
       username: NEW.username,
-      email: NEW.email,
-      display_name: NEW.username
+      email: NEW.email
+    }
+  }
+
+-- After update: keep profile in sync (creates if missing)
+CREATE TRIGGER sync_profile
+  AFTER UPDATE ON COLLECTION auth.users
+  FOR EACH ROW AS {
+    UPSERT DOCUMENT IN profiles NEW.id {
+      id: NEW.id,
+      username: NEW.username,
+      email: NEW.email
     }
   }
 
@@ -572,6 +583,18 @@ CREATE TRIGGER audit_delete
     }
   }`}</Code>
 
+      <H2>Trigger Body Statements</H2>
+      <Table
+        headers={["Statement", "Description"]}
+        rows={[
+          ["CREATE DOCUMENT IN coll key { fields }", "Insert new document (no-op if key exists)"],
+          ["UPSERT DOCUMENT IN coll key { fields }", "Insert if missing, update fields if exists"],
+          ["MATCH DOCUMENT d IN coll WHERE expr + SET d.field = expr", "Find and update matching documents"],
+          ["SET NEW.field = expr", "Modify new row (BEFORE INSERT/UPDATE only)"],
+          ["RAISE 'message'", "Abort the operation (BEFORE triggers only)"],
+        ]}
+      />
+
       <H2>OLD / NEW Variables</H2>
       <Table
         headers={["Event", "OLD", "NEW"]}
@@ -598,12 +621,14 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
           ["current_user()", "Session username"],
           ["is_sync()", "Whether operation is sync-originated"],
           ["timestamp()", "Current epoch ms"],
+          ["uuid()", "Generate a new UUID v4"],
         ]}
       />
 
       <P>
         Priority ordering (lower = first, default 100). Max recursion depth: 16.
         Use <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
+        <InlineCode>UPSERT DOCUMENT</InlineCode> only updates specified fields — existing fields are preserved.
       </P>
     </>
   );
