@@ -34,7 +34,7 @@ export function Sidebar({ favorites }: SidebarProps) {
     <aside className="flex flex-col w-56 h-full bg-zinc-900 border-r border-zinc-800">
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
-        <span className="text-sm font-bold text-zinc-100 font-mono">Anvil DB</span>
+        <img src="anvil.webp" className="" />
       </div>
 
       {/* Schema selector */}
