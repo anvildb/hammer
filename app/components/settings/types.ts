@@ -47,7 +47,7 @@ export interface UserSettings {
 
 export const DEFAULT_SETTINGS: UserSettings = {
   theme: "dark",
-  defaultResultView: "table",
+  defaultResultView: "graph",
   editor: {
     fontSize: 13,
     tabSize: 2,
