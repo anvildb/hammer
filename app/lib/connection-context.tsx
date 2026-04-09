@@ -35,8 +35,17 @@ interface ConnectionContextValue {
 const ConnectionContext = createContext<ConnectionContextValue | null>(null);
 
 const TOKENS_KEY = "anvil_tokens";
+const ANVIL_PORT = "7474";
 
-const client = new ApiClient({ baseUrl: "http://localhost:7474" });
+function resolveBaseUrl(): string {
+  if (typeof window === "undefined") return "http://localhost:7474";
+  // Allow explicit override via global (set in index.html or env).
+  if ((window as any).__ANVIL_API_URL__) return (window as any).__ANVIL_API_URL__;
+  // Derive from current page: keep protocol (http/https), use Anvil's API port.
+  return `${window.location.protocol}//${window.location.hostname}:${ANVIL_PORT}`;
+}
+
+const client = new ApiClient({ baseUrl: resolveBaseUrl() });
 
 export function ConnectionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");

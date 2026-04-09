@@ -2040,6 +2040,8 @@ anvil config          # Print effective config`}</Code>
 http_port = 7474
 bolt_port = 7687
 bind_address = "0.0.0.0"
+# tls_cert = "/etc/anvil/fullchain.pem"
+# tls_key = "/etc/anvil/privkey.pem"
 
 [storage]
 data_dir = "./data"
@@ -2056,6 +2058,19 @@ refresh_token_ttl_secs = 604800 # 7 days
 level = "info"
 slow_query_threshold_ms = 1000`}</Code>
 
+      <H2>TLS / HTTPS</H2>
+      <P>
+        Set <InlineCode>tls_cert</InlineCode> and <InlineCode>tls_key</InlineCode> in{" "}
+        <InlineCode>[server]</InlineCode> to enable HTTPS. Both must point to PEM files.
+      </P>
+      <Code>{`[server]
+tls_cert = "/etc/letsencrypt/live/example.com/fullchain.pem"
+tls_key = "/etc/letsencrypt/live/example.com/privkey.pem"
+
+# Or via environment variables:
+# ANVIL_TLS_CERT=/etc/anvil/fullchain.pem
+# ANVIL_TLS_KEY=/etc/anvil/privkey.pem`}</Code>
+
       <H2>Environment Variables</H2>
       <Table
         headers={["Variable", "Default"]}
@@ -2067,6 +2082,8 @@ slow_query_threshold_ms = 1000`}</Code>
           ["ANVIL_AUTH_ENABLED", "true"],
           ["ANVIL_DOCUMENT_STORAGE", "unified"],
           ["ANVIL_SLOW_QUERY_THRESHOLD", "1000"],
+          ["ANVIL_TLS_CERT", "(not set)"],
+          ["ANVIL_TLS_KEY", "(not set)"],
         ]}
       />
 
