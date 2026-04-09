@@ -7,10 +7,15 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+
+export function loader() {
+  return { anvilApiUrl: process.env.VITE_ANVIL_API_URL ?? "" };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -36,8 +41,9 @@ import { LoginScreen } from "./components/auth/login-screen";
 import { ChangePasswordScreen } from "./components/auth/change-password-screen";
 
 export default function App() {
+  const { anvilApiUrl } = useLoaderData<typeof loader>();
   return (
-    <ConnectionProvider>
+    <ConnectionProvider anvilApiUrl={anvilApiUrl}>
       <AuthGate>
         <AppShell>
           <Outlet />

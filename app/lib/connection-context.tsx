@@ -37,17 +37,20 @@ const ConnectionContext = createContext<ConnectionContextValue | null>(null);
 const TOKENS_KEY = "anvil_tokens";
 const ANVIL_PORT = "7474";
 
-function resolveBaseUrl(): string {
+function resolveBaseUrl(anvilApiUrl?: string): string {
+  if (anvilApiUrl) return anvilApiUrl;
   if (typeof window === "undefined") return "http://localhost:7474";
-  // Allow explicit override via global (set in index.html or env).
-  if ((window as any).__ANVIL_API_URL__) return (window as any).__ANVIL_API_URL__;
   // Derive from current page: keep protocol (http/https), use Anvil's API port.
   return `${window.location.protocol}//${window.location.hostname}:${ANVIL_PORT}`;
 }
 
-const client = new ApiClient({ baseUrl: resolveBaseUrl() });
+let client = new ApiClient({ baseUrl: resolveBaseUrl() });
 
-export function ConnectionProvider({ children }: { children: ReactNode }) {
+export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactNode; anvilApiUrl?: string }) {
+  // Update client base URL if provided via loader.
+  if (anvilApiUrl && client.baseUrl !== anvilApiUrl.replace(/\/$/, "")) {
+    client = new ApiClient({ baseUrl: anvilApiUrl });
+  }
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
