@@ -139,6 +139,10 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
   }, []);
 
   const logout = useCallback(() => {
+    // Delete the refresh token from the server to clean up the session.
+    if (client.refreshToken) {
+      client.deleteDocument("auth.refresh_tokens", client.refreshToken).catch(() => {});
+    }
     client.authToken = undefined;
     client.refreshToken = undefined;
     localStorage.removeItem(TOKENS_KEY);
