@@ -100,6 +100,23 @@ export default function ImportRoute() {
               >
                 Choose File
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/cyphers/tests.cypher");
+                    const text = await res.text();
+                    setScript(text);
+                    setFileName("tests.cypher");
+                    setResult(null);
+                    setError(null);
+                  } catch {
+                    setError("Failed to load sample data");
+                  }
+                }}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium rounded-md border border-zinc-700 transition-colors"
+              >
+                Load Sample Data
+              </button>
               <input
                 ref={fileRef}
                 type="file"
