@@ -365,6 +365,30 @@ RETURN p.name, friend.name, r.since`}</Code>
         ]}
       />
 
+      <H2>Comments</H2>
+      <P>
+        Anvil supports several comment styles. All comment markers are ignored inside quoted
+        strings.
+      </P>
+      <Table
+        headers={["Syntax", "Description"]}
+        rows={[
+          ["// comment", "Line comment (C-style)"],
+          ["-- comment", "Line comment (SQL-style). Note: --> is a relationship pattern, not a comment"],
+          ["# comment", "Line comment (shell-style)"],
+          ["/* comment */", "Block comment (may span multiple lines)"],
+        ]}
+      />
+      <Code>{`// This is a line comment
+-- This is also a line comment
+# And so is this
+
+/* This is a
+   block comment */
+
+MATCH (a)-[r]-->(b)  // --> here is a relationship, not a comment
+RETURN a, b`}</Code>
+
       <H2>Anvil Extensions</H2>
       <P>
         Beyond standard Cypher, Anvil adds first-class support for documents, stored functions,
@@ -892,6 +916,30 @@ RETURN p, d.joined`}</Code>
         ]}
       />
 
+      <H2>UPSERT DOCUMENT ... WHERE</H2>
+      <P>
+        Update documents matching a predicate instead of targeting a specific key. Supports
+        sync propagation when a sync rule is active on the collection.
+      </P>
+      <Code>{`-- Update all documents matching a condition
+UPSERT DOCUMENT IN profiles WHERE username = "alice"
+  SET status = "active", verified = true
+
+-- With multiple conditions
+UPSERT DOCUMENT IN orders WHERE status = "pending" AND total > 100
+  SET status = "processing", updated_at = timestamp()`}</Code>
+
+      <H2>DELETE DOCUMENT ... WHERE</H2>
+      <P>
+        Delete documents matching a predicate. Like the WHERE form of UPSERT, this supports
+        sync propagation.
+      </P>
+      <Code>{`-- Delete all matching documents
+DELETE DOCUMENT IN sessions WHERE expired = true
+
+-- With field comparison
+DELETE DOCUMENT IN cache WHERE created_at < timestamp() - 86400000`}</Code>
+
       <H2>Collection Features</H2>
       <Table
         headers={["Feature", "Description"]}
@@ -1098,9 +1146,25 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
         ]}
       />
 
+      <H2>Trigger Chaining</H2>
       <P>
-        Priority ordering: lower number fires first (default 100). Max recursion depth: 16.
-        Use <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
+        When an UPSERT DOCUMENT is executed inside a trigger body, it fires any AFTER triggers
+        defined on the target collection. This enables reactive pipelines where one trigger
+        can cascade into another.
+      </P>
+
+      <H2>Trigger Backfill</H2>
+      <P>
+        Creating a trigger automatically processes all existing records in its target label or
+        collection. This ensures that pre-existing data is consistent with the new trigger logic
+        without requiring a manual migration.
+      </P>
+
+      <H2>Execution Limits</H2>
+      <P>
+        Priority ordering: lower number fires first (default 100). Recursive trigger firing is
+        capped at 16 levels deep — exceeding this limit raises an error. Use{" "}
+        <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
       </P>
     </>
   );
@@ -1124,9 +1188,17 @@ ENABLE ROW LEVEL SECURITY ON :Project
 ENABLE ROW LEVEL SECURITY ON COLLECTION profiles`}</Code>
 
       <H2>CREATE POLICY</H2>
-      <Code>{`-- Users see only their own data
+      <P>
+        Syntax: <InlineCode>CREATE POLICY name ON target FOR op [TO role] USING (predicate)</InlineCode>.
+        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all roles.
+      </P>
+      <Code>{`-- Users see only their own data (role-specific)
 CREATE POLICY own_data ON :Project FOR SELECT TO reader
   USING (n.owner = current_user())
+
+-- Policy for all roles (TO clause omitted)
+CREATE POLICY public_read ON :Project FOR SELECT
+  USING (n.public = true)
 
 -- Multi-tenant isolation
 CREATE POLICY tenant ON :Project FOR ALL TO authenticated
@@ -1156,6 +1228,21 @@ CREATE POLICY knows_policy ON :KNOWS FOR SELECT TO reader
         ]}
       />
 
+      <H2>Write Enforcement</H2>
+      <P>
+        For write operations (INSERT, UPDATE, DELETE), the USING predicate is evaluated per-node
+        or per-document before the operation is applied. SET operations check the USING predicate
+        on each target node. UPSERT DOCUMENT checks the USING predicate on each target document.
+        RLS write policies bypass RBAC role checks — any user whose data matches the predicate
+        can write, regardless of their assigned role.
+      </P>
+
+      <H2>Deny-by-Default</H2>
+      <P>
+        When RLS is enabled on a label or collection, rows with no matching policy are denied.
+        You must create at least one permissive policy for any data to be accessible.
+      </P>
+
       <H2>Management</H2>
       <Code>{`DROP POLICY name ON :Label
 SHOW POLICIES
@@ -1169,10 +1256,16 @@ SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
       <Table
         headers={["Function", "Description"]}
         rows={[
-          ["current_user()", "The authenticated username"],
+          ["current_user()", "The authenticated user's UUID"],
+          ["current_username()", "The authenticated user's login username"],
           ["session('key')", "Custom session variable (e.g., tenant_id)"],
         ]}
       />
+
+      <H2>Persistence</H2>
+      <P>
+        RLS policies and enabled/disabled state persist across server restarts via snapshot v5.
+      </P>
 
       <P>
         When a sync rule links a label to a collection, a single policy on the label
@@ -1549,6 +1642,21 @@ function DocumentsSection() {
         <InlineCode>public</InlineCode> (default) and <InlineCode>auth</InlineCode> (system).
       </P>
 
+      <H2>Collection Management (Cypher)</H2>
+      <Code>{`-- Create a collection
+CREATE COLLECTION orders
+
+-- Create only if it doesn't already exist
+CREATE COLLECTION IF NOT EXISTS orders
+
+-- Drop a collection
+DROP COLLECTION orders`}</Code>
+      <P>
+        System collections in the <InlineCode>auth.*</InlineCode> namespace (e.g.{" "}
+        <InlineCode>auth.users</InlineCode>, <InlineCode>auth.roles</InlineCode>) cannot be
+        dropped.
+      </P>
+
       <H2>REST API</H2>
       <Table
         headers={["Method", "Endpoint", "Description"]}
@@ -1811,9 +1919,25 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
         ]}
       />
 
+      <H2>Trigger Chaining</H2>
       <P>
-        Priority ordering (lower = first, default 100). Max recursion depth: 16.
-        Use <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
+        When an UPSERT DOCUMENT is executed inside a trigger body, it fires any AFTER triggers
+        defined on the target collection. This enables reactive pipelines where one trigger
+        can cascade into another.
+      </P>
+
+      <H2>Trigger Backfill</H2>
+      <P>
+        Creating a trigger automatically processes all existing records in its target label or
+        collection. Pre-existing data is made consistent with the new trigger logic without
+        requiring a manual migration.
+      </P>
+
+      <H2>Execution Limits</H2>
+      <P>
+        Priority ordering (lower = first, default 100). Recursive trigger firing is capped at
+        16 levels deep — exceeding this limit raises an error. Use{" "}
+        <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
         <InlineCode>UPSERT DOCUMENT</InlineCode> only updates specified fields — existing fields are preserved.
       </P>
     </>
@@ -1834,9 +1958,17 @@ function RLSSection() {
 -- Deny-by-default: without policies, no rows visible`}</Code>
 
       <H2>Create Policies</H2>
-      <Code>{`-- Users see only their own data
+      <P>
+        Syntax: <InlineCode>CREATE POLICY name ON target FOR op [TO role] USING (predicate)</InlineCode>.
+        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all roles.
+      </P>
+      <Code>{`-- Users see only their own data (role-specific)
 CREATE POLICY own_data ON :Project FOR SELECT TO reader
   USING (n.owner = current_user())
+
+-- Policy for all roles (TO clause omitted)
+CREATE POLICY public_read ON :Project FOR SELECT
+  USING (n.public = true)
 
 -- Multi-tenant isolation
 CREATE POLICY tenant ON :Project FOR ALL TO authenticated
@@ -1845,6 +1977,29 @@ CREATE POLICY tenant ON :Project FOR ALL TO authenticated
 -- Restrictive policy (AND logic)
 CREATE POLICY no_secret ON :Document FOR SELECT TO reader
   USING (n.classification != 'SECRET') AS RESTRICTIVE`}</Code>
+
+      <H2>Session Functions</H2>
+      <Table
+        headers={["Function", "Description"]}
+        rows={[
+          ["current_user()", "The authenticated user's UUID"],
+          ["current_username()", "The authenticated user's login username"],
+          ["session('key')", "Custom session variable (e.g., tenant_id)"],
+        ]}
+      />
+
+      <H2>Write Enforcement</H2>
+      <P>
+        SET operations check the USING predicate per-node before applying changes.
+        UPSERT DOCUMENT checks the USING predicate per-document. RLS write policies bypass
+        RBAC role checks — any user whose data matches the predicate can write.
+      </P>
+
+      <H2>Deny-by-Default</H2>
+      <P>
+        When RLS is enabled, rows with no matching policy are denied. You must create at least
+        one permissive policy for any data to be accessible.
+      </P>
 
       <H2>Sync Pairs</H2>
       <P>
@@ -1858,6 +2013,11 @@ SHOW POLICIES
 SHOW POLICIES ON :Label
 ENABLE / DISABLE / FORCE ROW LEVEL SECURITY ON :Label
 SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
+
+      <H2>Persistence</H2>
+      <P>
+        RLS policies and enabled/disabled state persist across server restarts via snapshot v5.
+      </P>
     </>
   );
 }
