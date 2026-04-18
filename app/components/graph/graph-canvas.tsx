@@ -411,54 +411,101 @@ export function GraphCanvas({
         </defs>
         <g ref={gRef} transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
           {/* Edges */}
-          {edges.map((edge) => {
-            const src = typeof edge.source === "string" ? null : edge.source;
-            const tgt = typeof edge.target === "string" ? null : edge.target;
-            if (!src || !tgt) return null;
-            const sx = src.x ?? 0;
-            const sy = src.y ?? 0;
-            const tx = tgt.x ?? 0;
-            const ty = tgt.y ?? 0;
-            const mx = (sx + tx) / 2;
-            const my = (sy + ty) / 2;
-            const r = nodeRadius(tgt);
-            const dx = tx - sx;
-            const dy = ty - sy;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const endX = tx - (dx / dist) * (r + 4);
-            const endY = ty - (dy / dist) * (r + 4);
-            const isFocusEdge = focusNodeId != null && (src.id === focusNodeId || tgt.id === focusNodeId);
+          {(() => {
+            // Group edges by node pair to detect parallel edges.
+            const pairIndex = new Map<string, number>();
+            const pairCount = new Map<string, number>();
+            for (const edge of edges) {
+              const sid = typeof edge.source === "string" ? edge.source : edge.source.id;
+              const tid = typeof edge.target === "string" ? edge.target : edge.target.id;
+              const pairKey = sid < tid ? `${sid}|${tid}` : `${tid}|${sid}`;
+              pairCount.set(pairKey, (pairCount.get(pairKey) ?? 0) + 1);
+            }
+            const pairSeen = new Map<string, number>();
 
-            return (
-              <g key={edge.id} style={focusNodeId && !isFocusEdge ? { opacity: 0.2 } : undefined}>
-                <line
-                  x1={sx}
-                  y1={sy}
-                  x2={endX}
-                  y2={endY}
-                  stroke={isFocusEdge ? "#fef9c3" : "#3f3f46"}
-                  strokeWidth={edgeWidth(edge)}
-                  markerEnd={isFocusEdge ? "url(#arrowhead-focus)" : "url(#arrowhead)"}
-                  className="cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectEdge(edge.id);
-                    onInspectEdge(edge);
-                  }}
-                  onContextMenu={(e) => handleEdgeContextMenu(e, edge)}
-                />
-                {(isFocusEdge || !focusNodeId) && <text
-                  x={mx}
-                  y={my - 4}
-                  textAnchor="middle"
-                  className={`text-[8px] pointer-events-none select-none ${isFocusEdge ? "fill-yellow-400" : "fill-zinc-600"}`}
-                  style={{ fontFamily: "var(--font-geist-mono, monospace)" }}
-                >
-                  {edge.type}
-                </text>}
-              </g>
-            );
-          })}
+            return edges.map((edge) => {
+              const src = typeof edge.source === "string" ? null : edge.source;
+              const tgt = typeof edge.target === "string" ? null : edge.target;
+              if (!src || !tgt) return null;
+              const sx = src.x ?? 0;
+              const sy = src.y ?? 0;
+              const tx = tgt.x ?? 0;
+              const ty = tgt.y ?? 0;
+              const r = nodeRadius(tgt);
+              const dx = tx - sx;
+              const dy = ty - sy;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+              // Compute curve offset for parallel edges.
+              const pairKey = src.id < tgt.id ? `${src.id}|${tgt.id}` : `${tgt.id}|${src.id}`;
+              const total = pairCount.get(pairKey) ?? 1;
+              const idx = pairSeen.get(pairKey) ?? 0;
+              pairSeen.set(pairKey, idx + 1);
+
+              // Perpendicular unit vector — always computed from the normalized
+              // pair direction (lower ID → higher ID) so parallel edges curve
+              // consistently regardless of which node is source vs target.
+              const normFlip = src.id < tgt.id ? 1 : -1;
+              const px = (-dy / dist) * normFlip;
+              const py = (dx / dist) * normFlip;
+              // Spread: center the offsets around 0.
+              const spread = 40;
+              const offset = total <= 1 ? 0 : (idx - (total - 1) / 2) * spread;
+
+              // Control point for quadratic bezier.
+              const cpx = (sx + tx) / 2 + px * offset;
+              const cpy = (sy + ty) / 2 + py * offset;
+
+              // Shorten end to account for node radius + arrowhead.
+              const endDx = tx - cpx;
+              const endDy = ty - cpy;
+              const endDist = Math.sqrt(endDx * endDx + endDy * endDy) || 1;
+              const endX = tx - (endDx / endDist) * (r + 4);
+              const endY = ty - (endDy / endDist) * (r + 4);
+
+              // Label position: shift along the curve so opposite-side labels
+              // don't sit at the same horizontal level. Edges curving one way
+              // place their label at t=0.35, the other at t=0.65.
+              const t = offset >= 0 ? 0.35 : 0.65;
+              const mt = 1 - t;
+              const lx = mt * mt * sx + 2 * mt * t * cpx + t * t * tx;
+              const ly = mt * mt * sy + 2 * mt * t * cpy + t * t * ty;
+
+              const isFocusEdge = focusNodeId != null && (src.id === focusNodeId || tgt.id === focusNodeId);
+
+              const pathD = total <= 1
+                ? `M ${sx} ${sy} L ${endX} ${endY}`
+                : `M ${sx} ${sy} Q ${cpx} ${cpy} ${endX} ${endY}`;
+
+              return (
+                <g key={edge.id} style={focusNodeId && !isFocusEdge ? { opacity: 0.2 } : undefined}>
+                  <path
+                    d={pathD}
+                    fill="none"
+                    stroke={isFocusEdge ? "#fef9c3" : "#3f3f46"}
+                    strokeWidth={edgeWidth(edge)}
+                    markerEnd={isFocusEdge ? "url(#arrowhead-focus)" : "url(#arrowhead)"}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectEdge(edge.id);
+                      onInspectEdge(edge);
+                    }}
+                    onContextMenu={(e) => handleEdgeContextMenu(e, edge)}
+                  />
+                  {(isFocusEdge || !focusNodeId) && <text
+                    x={lx}
+                    y={ly - 4}
+                    textAnchor="middle"
+                    className={`text-[8px] pointer-events-none select-none ${isFocusEdge ? "fill-yellow-400" : "fill-zinc-600"}`}
+                    style={{ fontFamily: "var(--font-geist-mono, monospace)" }}
+                  >
+                    {edge.type}
+                  </text>}
+                </g>
+              );
+            });
+          })()}
 
           {/* Nodes */}
           {(() => {

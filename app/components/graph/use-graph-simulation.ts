@@ -51,9 +51,10 @@ export function useGraphSimulation({
         "link",
         forceLink(edges as unknown as SimulationLinkDatum<SimulationNodeDatum>[])
           .id((d: unknown) => (d as GraphNode).id)
-          .distance(120)
+          .distance(300)
+          .strength(0.5)
       )
-      .force("charge", forceManyBody().strength(-300))
+      .force("charge", forceManyBody().strength(-200).distanceMax(500))
       .force("center", forceCenter(width / 2, height / 2))
       .force("collide", forceCollide(30))
       .on("tick", onTick);
@@ -85,8 +86,8 @@ export function useGraphSimulation({
       // Restore defaults — remove focus forces.
       sim.force("focusRadial", null);
       const linkForce = sim.force("link") as ReturnType<typeof forceLink> | undefined;
-      linkForce?.distance(120).strength(1 / 3);
-      (sim.force("charge") as ReturnType<typeof forceManyBody> | undefined)?.strength(-300);
+      linkForce?.distance(300).strength(0.5);
+      (sim.force("charge") as ReturnType<typeof forceManyBody> | undefined)?.strength(-200);
       sim.alpha(0.3).restart();
       return;
     }
@@ -266,4 +267,96 @@ function applyStaticLayout(
     default:
       break;
   }
+}
+
+/**
+ * Build connected-component clusters via union-find.
+ * Returns a Map from node ID → Set of all node IDs in that cluster.
+ */
+function buildClusters(
+  nodes: GraphNode[],
+  edges: GraphEdge[]
+): Map<string, Set<string>> {
+  const parent = new Map<string, string>();
+  function find(x: string): string {
+    let p = parent.get(x) ?? x;
+    while (p !== (parent.get(p) ?? p)) {
+      p = parent.get(p) ?? p;
+    }
+    parent.set(x, p);
+    return p;
+  }
+  function union(a: string, b: string) {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+
+  for (const n of nodes) parent.set(n.id, n.id);
+  for (const e of edges) {
+    const sid = typeof e.source === "string" ? e.source : e.source.id;
+    const tid = typeof e.target === "string" ? e.target : e.target.id;
+    union(sid, tid);
+  }
+
+  // Group nodes by root.
+  const groups = new Map<string, Set<string>>();
+  for (const n of nodes) {
+    const root = find(n.id);
+    if (!groups.has(root)) groups.set(root, new Set());
+    groups.get(root)!.add(n.id);
+  }
+
+  // Map every node to its cluster set.
+  const result = new Map<string, Set<string>>();
+  for (const n of nodes) {
+    result.set(n.id, groups.get(find(n.id))!);
+  }
+  return result;
+}
+
+/**
+ * Custom clustering force: nudge nodes toward their cluster centroid.
+ * This pulls connected components together without collapsing them.
+ */
+function forceCluster(
+  nodes: GraphNode[],
+  clusters: Map<string, Set<string>>,
+  strength: number
+) {
+  return () => {
+    // Compute centroid of each cluster.
+    const centroids = new Map<Set<string>, { cx: number; cy: number; n: number }>();
+    for (const node of nodes) {
+      const cluster = clusters.get(node.id);
+      if (!cluster) continue;
+      let c = centroids.get(cluster);
+      if (!c) {
+        c = { cx: 0, cy: 0, n: 0 };
+        centroids.set(cluster, c);
+      }
+      c.cx += node.x ?? 0;
+      c.cy += node.y ?? 0;
+      c.n += 1;
+    }
+    for (const c of centroids.values()) {
+      if (c.n > 0) {
+        c.cx /= c.n;
+        c.cy /= c.n;
+      }
+    }
+
+    // Nudge each node toward its cluster centroid.
+    for (const node of nodes) {
+      if (node.fx !== undefined) continue; // pinned
+      const cluster = clusters.get(node.id);
+      if (!cluster || cluster.size <= 1) continue;
+      const c = centroids.get(cluster);
+      if (!c) continue;
+      const dx = c.cx - (node.x ?? 0);
+      const dy = c.cy - (node.y ?? 0);
+      node.vx = (node.vx ?? 0) + dx * strength;
+      node.vy = (node.vy ?? 0) + dy * strength;
+    }
+  };
 }
