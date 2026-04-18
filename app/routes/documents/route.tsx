@@ -9,7 +9,8 @@ interface CollectionEntry {
 }
 
 export default function DocumentsRoute() {
-  const { client, status, selectedSchema } = useConnection();
+  const { client, status, selectedSchema, isAdmin, userRoles } = useConnection();
+  const canWrite = isAdmin || userRoles.includes("editor");
 
   // Collection management
   const [collections, setCollections] = useState<CollectionEntry[]>([]);
@@ -317,36 +318,42 @@ export default function DocumentsRoute() {
       <div className="w-64 flex-shrink-0 border-r border-zinc-800 flex flex-col">
         <div className="p-3 border-b border-zinc-800">
           <h2 className="text-sm font-semibold text-zinc-300 mb-2">Collections</h2>
-          <div className="flex gap-1.5">
-            <input
-              type="text"
-              value={newCollectionName}
-              onChange={(e) => setNewCollectionName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateCollection();
-              }}
-              placeholder="Collection name..."
-              className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div className="flex gap-1.5 mt-1.5">
-            <button
-              onClick={handleCreateCollection}
-              disabled={!newCollectionName.trim()}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
-            >
-              Create
-            </button>
-            <button
-              onClick={handleAddExistingCollection}
-              disabled={!newCollectionName.trim()}
-              className="px-2 py-1 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-200 text-xs font-medium rounded transition-colors"
-            >
-              Add Existing
-            </button>
-          </div>
-          {collectionError && (
-            <p className="mt-1.5 text-xs text-red-400 break-words">{collectionError}</p>
+          {canWrite ? (
+            <>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateCollection();
+                  }}
+                  placeholder="Collection name..."
+                  className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-1.5 mt-1.5">
+                <button
+                  onClick={handleCreateCollection}
+                  disabled={!newCollectionName.trim()}
+                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
+                >
+                  Create
+                </button>
+                <button
+                  onClick={handleAddExistingCollection}
+                  disabled={!newCollectionName.trim()}
+                  className="px-2 py-1 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-200 text-xs font-medium rounded transition-colors"
+                >
+                  Add Existing
+                </button>
+              </div>
+              {collectionError && (
+                <p className="mt-1.5 text-xs text-red-400 break-words">{collectionError}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-zinc-600">Read-only access</p>
           )}
         </div>
 
@@ -367,118 +374,137 @@ export default function DocumentsRoute() {
               onClick={() => handleSelectCollection(col.name)}
             >
               <span className="truncate font-mono text-xs">{col.name}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDropCollection(col.name);
-                }}
-                className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 text-xs px-1 transition-opacity"
-                title="Drop collection"
-              >
-                Drop
-              </button>
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(`CREATE COLLECTION ${col.name}`);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1 transition-opacity"
+                  title="Copy CREATE COLLECTION statement"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                    <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
+                    <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
+                  </svg>
+                </button>
+                {canWrite && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDropCollection(col.name);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 text-xs px-1 transition-opacity"
+                    title="Drop collection"
+                  >
+                    Drop
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Sync Rules section */}
-        <div className="border-t border-zinc-800">
-          <button
-            onClick={() => setSyncOpen(!syncOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200"
-          >
-            <span>Sync Rules ({syncRules.length})</span>
-            <span>{syncOpen ? "−" : "+"}</span>
-          </button>
+        {/* Sync Rules section — only visible for admin/editor */}
+        {canWrite && (
+          <div className="border-t border-zinc-800">
+            <button
+              onClick={() => setSyncOpen(!syncOpen)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200"
+            >
+              <span>Sync Rules ({syncRules.length})</span>
+              <span>{syncOpen ? "−" : "+"}</span>
+            </button>
 
-          {syncOpen && (
-            <div className="px-3 pb-3 space-y-2">
-              {/* Existing rules */}
-              {syncRules.length === 0 && (
-                <p className="text-[11px] text-zinc-600 italic">No sync rules defined</p>
-              )}
-              {syncRules.map((rule) => (
-                <div
-                  key={String(rule.id)}
-                  className="group flex items-start justify-between bg-zinc-900 rounded px-2 py-1.5 text-[11px]"
-                >
-                  <div className="min-w-0">
-                    <div className="text-zinc-300 font-mono">
-                      :{String(rule.label)} → {String(rule.collection)}
+            {syncOpen && (
+              <div className="px-3 pb-3 space-y-2">
+                {/* Existing rules */}
+                {syncRules.length === 0 && (
+                  <p className="text-[11px] text-zinc-600 italic">No sync rules defined</p>
+                )}
+                {syncRules.map((rule) => (
+                  <div
+                    key={String(rule.id)}
+                    className="group flex items-start justify-between bg-zinc-900 rounded px-2 py-1.5 text-[11px]"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-zinc-300 font-mono">
+                        :{String(rule.label)} → {String(rule.collection)}
+                      </div>
+                      <div className="text-zinc-500">
+                        key={String(rule.key_property)}{" "}
+                        {rule.include && rule.include !== "*" ? `include=${String(rule.include)}` : "(all props)"}
+                      </div>
                     </div>
-                    <div className="text-zinc-500">
-                      key={String(rule.key_property)}{" "}
-                      {rule.include && rule.include !== "*" ? `include=${String(rule.include)}` : "(all props)"}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          const include = rule.include && rule.include !== "*" ? ` INCLUDE ${String(rule.include)}` : "";
+                          const query = `SYNC LABEL ${String(rule.label)} TO COLLECTION ${String(rule.collection)} KEY ${String(rule.key_property)}${include}`;
+                          navigator.clipboard.writeText(query);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1 transition-opacity"
+                        title="Copy SYNC LABEL statement"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                          <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
+                          <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDropSyncRule(rule.id)}
+                        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 px-1 transition-opacity"
+                      >
+                        Drop
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => {
-                        const include = rule.include && rule.include !== "*" ? ` INCLUDE ${String(rule.include)}` : "";
-                        const query = `SYNC LABEL ${String(rule.label)} TO COLLECTION ${String(rule.collection)} KEY ${String(rule.key_property)}${include}`;
-                        navigator.clipboard.writeText(query);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1 transition-opacity"
-                      title="Copy SYNC LABEL statement"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-                        <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
-                        <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDropSyncRule(rule.id)}
-                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 px-1 transition-opacity"
-                    >
-                      Drop
-                    </button>
-                  </div>
+                ))}
+
+                {/* Create new rule form */}
+                <div className="space-y-1 pt-1 border-t border-zinc-800">
+                  <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">New Sync Rule</p>
+                  <input
+                    type="text"
+                    value={syncLabel}
+                    onChange={(e) => setSyncLabel(e.target.value)}
+                    placeholder="Label (e.g. Person)"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    value={syncCollection}
+                    onChange={(e) => setSyncCollection(e.target.value)}
+                    placeholder="Collection (e.g. persons)"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    value={syncKey}
+                    onChange={(e) => setSyncKey(e.target.value)}
+                    placeholder="Key property (e.g. name)"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    value={syncInclude}
+                    onChange={(e) => setSyncInclude(e.target.value)}
+                    placeholder="Include props (e.g. name, email) or blank for all"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    onClick={handleCreateSyncRule}
+                    disabled={!syncLabel.trim() || !syncCollection.trim() || !syncKey.trim()}
+                    className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
+                  >
+                    Create Sync Rule
+                  </button>
+                  {syncError && <p className="text-red-400 text-[11px]">{syncError}</p>}
                 </div>
-              ))}
-
-              {/* Create new rule form */}
-              <div className="space-y-1 pt-1 border-t border-zinc-800">
-                <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">New Sync Rule</p>
-                <input
-                  type="text"
-                  value={syncLabel}
-                  onChange={(e) => setSyncLabel(e.target.value)}
-                  placeholder="Label (e.g. Person)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  value={syncCollection}
-                  onChange={(e) => setSyncCollection(e.target.value)}
-                  placeholder="Collection (e.g. persons)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  value={syncKey}
-                  onChange={(e) => setSyncKey(e.target.value)}
-                  placeholder="Key property (e.g. name)"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  value={syncInclude}
-                  onChange={(e) => setSyncInclude(e.target.value)}
-                  placeholder="Include props (e.g. name, email) or blank for all"
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                />
-                <button
-                  onClick={handleCreateSyncRule}
-                  disabled={!syncLabel.trim() || !syncCollection.trim() || !syncKey.trim()}
-                  className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
-                >
-                  Create Sync Rule
-                </button>
-                {syncError && <p className="text-red-400 text-[11px]">{syncError}</p>}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right panel: Document browser + viewer */}

@@ -12,7 +12,8 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const { status, currentUser, logout } = useConnection();
+  const { status, currentUser, userRoles, isAdmin, logout } = useConnection();
+  const canWrite = isAdmin || userRoles.includes("editor");
 
   // Global Cmd+K shortcut.
   useEffect(() => {
@@ -33,6 +34,7 @@ export function AppShell({ children }: AppShellProps) {
         <TopBar
           connectionStatus={status}
           username={currentUser ?? "anonymous"}
+          readOnly={!canWrite}
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           onLogout={logout}
         />
