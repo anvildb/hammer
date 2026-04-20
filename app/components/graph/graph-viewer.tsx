@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import type { GraphNode, GraphEdge, GraphData, VisConfig } from "./types";
 import { DEFAULT_VIS_CONFIG } from "./types";

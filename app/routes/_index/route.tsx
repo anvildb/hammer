@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 export default function IndexRoute() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-zinc-100">

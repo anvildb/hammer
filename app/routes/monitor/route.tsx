@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MonitoringDashboard } from "~/components/monitor/monitoring-dashboard";
 import type { MonitorData, ThroughputPoint } from "~/components/monitor/types";

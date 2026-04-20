@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 /**
  * WebSocket client for GraphQL subscriptions (graphql-ws protocol).
  *

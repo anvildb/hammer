@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 import { useState, useCallback } from "react";
 import type { QueryResult, ResultViewMode } from "./types";
 import { TableView } from "./table-view";

@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 import type { GraphDefaults } from "./types";
 import type { LayoutAlgorithm } from "~/components/graph/types";
 import { SettingRow } from "./theme-setting";

@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Devforge Pty Ltd. All rights reserved.
-// Author: Benjamin C. Tehan
 import { useState, useCallback, useEffect } from "react";
 import { useConnection } from "~/lib/connection-context";
 import type { DocumentResponse, DocumentQueryResponse, CypherResult } from "~/lib/api-client";
