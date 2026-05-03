@@ -26,6 +26,9 @@ interface ConnectionContextValue {
   selectedSchema: Schema;
   setSelectedSchema: (schema: Schema) => void;
   login: (username: string, password: string) => Promise<void>;
+  otpRequest: (email: string) => Promise<{ message: string; expires_in_seconds: number }>;
+  otpVerify: (email: string, code: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<{ message: string }>;
   logout: () => void;
   clearMustChangePassword: () => void;
 }
@@ -132,6 +135,25 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
     setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
   }, []);
 
+  const otpRequest = useCallback(async (email: string) => {
+    return client.otpRequest(email);
+  }, []);
+
+  const otpVerify = useCallback(async (email: string, code: string) => {
+    const result = await client.otpVerify(email, code);
+    client.refreshToken = result.refreshToken;
+    localStorage.setItem(TOKENS_KEY, JSON.stringify(result));
+    setIsAuthenticated(true);
+    const payload = parseJwtPayload(result.accessToken);
+    setCurrentUser(payload?.username as string ?? email.split("@")[0]);
+    setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
+    setMustChangePassword(false);
+  }, []);
+
+  const resendVerification = useCallback(async (email: string) => {
+    return client.resendVerification(email);
+  }, []);
+
   const clearMustChangePassword = useCallback(() => {
     setMustChangePassword(false);
   }, []);
@@ -153,7 +175,7 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
 
   return (
     <ConnectionContext.Provider
-      value={{ client, status, serverInfo, isAuthenticated, mustChangePassword, currentUser, userRoles, isAdmin, selectedSchema, setSelectedSchema, login, logout, clearMustChangePassword }}
+      value={{ client, status, serverInfo, isAuthenticated, mustChangePassword, currentUser, userRoles, isAdmin, selectedSchema, setSelectedSchema, login, otpRequest, otpVerify, resendVerification, logout, clearMustChangePassword }}
     >
       {children}
     </ConnectionContext.Provider>

@@ -370,6 +370,26 @@ export class ApiClient {
     await this.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
   }
 
+  /** Request an OTP code to be sent to the given email. */
+  async otpRequest(email: string): Promise<{ message: string; expires_in_seconds: number }> {
+    return this.post("/auth/otp/request", { email });
+  }
+
+  /** Verify an OTP code and get JWT tokens. */
+  async otpVerify(email: string, code: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+    mustChangePassword: boolean;
+  }> {
+    return this.post("/auth/otp/verify", { email, code });
+  }
+
+  /** Resend email verification. */
+  async resendVerification(email: string): Promise<{ message: string }> {
+    return this.post("/auth/resend-verification", { email });
+  }
+
   // -- HTTP helpers --
 
   private async get<T>(path: string): Promise<T> {
