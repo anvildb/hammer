@@ -49,6 +49,11 @@ export function ObjectDrawer({
   const [transform, setTransform] = useState<ImageTransform>({});
   const [moveTarget, setMoveTarget] = useState(file.path);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [copiedTarget, setCopiedTarget] = useState<"public" | "signed" | null>(null);
+
+  const publicUrl = bucketPublic
+    ? client.publicObjectUrl(bucket, file.path)
+    : null;
 
   const isImage = file.mime_type.startsWith("image/");
   const isVideo = file.mime_type.startsWith("video/");
@@ -126,10 +131,15 @@ export function ObjectDrawer({
     }
   }
 
-  async function handleCopyUrl() {
-    if (!signedUrl) return;
+  async function handleCopy(value: string, target: "public" | "signed") {
     try {
-      await navigator.clipboard.writeText(signedUrl);
+      await navigator.clipboard.writeText(value);
+      setCopiedTarget(target);
+      // Reset the "Copied!" affordance after a short delay so repeated
+      // copies still give visual feedback.
+      window.setTimeout(() => {
+        setCopiedTarget((current) => (current === target ? null : current));
+      }, 1500);
     } catch {
       // Clipboard API may be unavailable in some contexts; silently ignore.
     }
@@ -211,11 +221,49 @@ export function ObjectDrawer({
         )}
       </section>
 
+      {/* Public link (only for public buckets) */}
+      {publicUrl && (
+        <section className="px-4 py-3 border-b border-zinc-800">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+            Public link
+          </h3>
+          <p className="text-[10px] text-zinc-500 mb-2">
+            Permanent URL — works without auth as long as the bucket stays
+            public. Toggle the bucket private to revoke instantly.
+          </p>
+          <div className="flex items-start gap-1">
+            <code className="flex-1 min-w-0 break-all text-[10px] bg-zinc-900 rounded p-1.5 text-zinc-300">
+              {publicUrl}
+            </code>
+            <button
+              onClick={() => handleCopy(publicUrl, "public")}
+              className="px-1.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-[10px] rounded"
+              title="Copy public URL"
+            >
+              {copiedTarget === "public" ? "Copied!" : "Copy"}
+            </button>
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="px-1.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-[10px] rounded"
+              title="Open in new tab"
+            >
+              Open
+            </a>
+          </div>
+        </section>
+      )}
+
       {/* Signed URL */}
       <section className="px-4 py-3 border-b border-zinc-800">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
           Signed URL
         </h3>
+        <p className="text-[10px] text-zinc-500 mb-2">
+          Short-lived link with embedded HMAC token. Use for private buckets
+          or time-boxed sharing.
+        </p>
         <label className="block text-[11px] text-zinc-500 mb-1">
           TTL (seconds)
         </label>
@@ -239,11 +287,11 @@ export function ObjectDrawer({
               {signedUrl}
             </code>
             <button
-              onClick={handleCopyUrl}
+              onClick={() => handleCopy(signedUrl, "signed")}
               className="px-1.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-[10px] rounded"
-              title="Copy"
+              title="Copy signed URL"
             >
-              Copy
+              {copiedTarget === "signed" ? "Copied!" : "Copy"}
             </button>
           </div>
         )}
