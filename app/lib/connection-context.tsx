@@ -11,7 +11,7 @@ import { ApiClient, type ServerInfo } from "./api-client";
 
 export type ConnectionStatus = "connected" | "disconnected" | "connecting";
 
-export const SCHEMAS = ["public", "auth"] as const;
+export const SCHEMAS = ["public", "auth", "system"] as const;
 export type Schema = (typeof SCHEMAS)[number];
 
 interface ConnectionContextValue {

@@ -25,6 +25,7 @@ export default function DocumentsRoute() {
         if (!cancelled) {
           const filtered = colls.filter((c) => {
             if (selectedSchema === "auth") return c.name.startsWith("auth.");
+            if (selectedSchema === "system") return c.name.startsWith("system.");
             return !c.name.includes(".");
           });
           setCollections(

@@ -153,3 +153,22 @@ test.describe("Settings", () => {
     await expect(page.locator("text=Light")).toBeVisible();
   });
 });
+
+test.describe("Storage (Phase 25.15)", () => {
+  test("sidebar entry is present", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("text=Storage").first()).toBeVisible();
+  });
+
+  test("navigates to /storage with bucket list and tabs", async ({ page }) => {
+    await page.goto("/");
+    await page.click("text=Storage");
+    await expect(page).toHaveURL(/\/storage/);
+    await expect(page.locator("text=Buckets")).toBeVisible();
+    // Tabs render once a bucket is selected; even with no buckets the
+    // empty-state message should appear in the main pane.
+    await expect(
+      page.locator("text=/Select or create a bucket|No buckets yet/"),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+});

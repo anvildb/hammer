@@ -6,14 +6,17 @@ import { ThemeSetting, SettingRow } from "./theme-setting";
 import { EditorSettings } from "./editor-settings";
 import { GraphDefaultsSettings } from "./graph-defaults-settings";
 import { ConnectionProfiles } from "./connection-profiles";
+import { ServerSettings } from "./server-settings";
+import { useConnection } from "~/lib/connection-context";
 
-type Section = "general" | "editor" | "graph" | "connections";
+type Section = "general" | "editor" | "graph" | "connections" | "server";
 
-const sections: { id: Section; label: string }[] = [
+const baseSections: { id: Section; label: string; adminOnly?: boolean }[] = [
   { id: "general", label: "General" },
   { id: "editor", label: "Editor" },
   { id: "graph", label: "Graph" },
   { id: "connections", label: "Connections" },
+  { id: "server", label: "Server", adminOnly: true },
 ];
 
 const resultViews: { value: ResultViewMode; label: string }[] = [
@@ -24,8 +27,10 @@ const resultViews: { value: ResultViewMode; label: string }[] = [
 ];
 
 export function SettingsPage() {
+  const { isAdmin } = useConnection();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [active, setActive] = useState<Section>("general");
+  const sections = baseSections.filter((s) => !s.adminOnly || isAdmin);
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -59,7 +64,7 @@ export function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 max-w-xl">
+      <div className={`flex-1 overflow-auto p-4 ${active === "server" ? "max-w-3xl" : "max-w-xl"}`}>
         {active === "general" && (
           <>
             <SectionTitle title="General" />
@@ -130,6 +135,13 @@ export function SettingsPage() {
                 })
               }
             />
+          </>
+        )}
+
+        {active === "server" && (
+          <>
+            <SectionTitle title="Runtime Settings" />
+            <ServerSettings />
           </>
         )}
       </div>

@@ -7,6 +7,7 @@ const navItems = [
   { path: "/graph", label: "Graph", icon: "share-2", schemaAware: false, adminOnly: false },
   { path: "/schema", label: "Schema", icon: "database", schemaAware: true, adminOnly: false },
   { path: "/documents", label: "Documents", icon: "file-text", schemaAware: true, adminOnly: false },
+  { path: "/storage", label: "Storage", icon: "archive", schemaAware: false, adminOnly: false },
   { path: "/policies", label: "Policies", icon: "shield", schemaAware: true, adminOnly: true },
   { path: "/functions", label: "Functions", icon: "zap", schemaAware: true, adminOnly: true },
   { path: "/triggers", label: "Triggers", icon: "bolt", schemaAware: false, adminOnly: true },
