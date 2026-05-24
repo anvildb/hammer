@@ -2,15 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import { UserManagement } from "~/components/admin/user-management";
 import { RoleManagement } from "~/components/admin/role-management";
 import { DatabaseManagement } from "~/components/admin/database-management";
+import { ServiceAccountManagement } from "~/components/admin/service-account-management";
 import type { User, Role, DatabaseInfo } from "~/components/admin/types";
 import { useConnection } from "~/lib/connection-context";
 import type { EventEntry } from "~/lib/api-client";
 
-type Tab = "users" | "roles" | "databases" | "events" | "alerts";
+type Tab = "users" | "roles" | "service-accounts" | "databases" | "events" | "alerts";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "users", label: "Users" },
   { id: "roles", label: "Roles" },
+  { id: "service-accounts", label: "Service Accounts" },
   { id: "databases", label: "Databases" },
   { id: "events", label: "Event Log" },
   { id: "alerts", label: "Alerts" },
@@ -213,6 +215,12 @@ export default function AdminRoute() {
             onDeleteRole={() => {}}
             onGrantPrivilege={() => {}}
             onRevokePrivilege={() => {}}
+          />
+        )}
+        {activeTab === "service-accounts" && (
+          <ServiceAccountManagement
+            client={client}
+            availableRoles={roles.map((r) => r.name)}
           />
         )}
         {activeTab === "databases" && (

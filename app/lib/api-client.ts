@@ -262,6 +262,35 @@ export interface StorageUsageResponse {
   max_total_storage?: number;
 }
 
+export interface ServiceAccount {
+  id: string;
+  name: string;
+  description: string;
+  roles: string[];
+  created_by: string;
+  created_on: number;
+  disabled: boolean;
+  service_role: boolean;
+}
+
+export interface ApiKey {
+  id: string;
+  service_account_id: string;
+  prefix: string;
+  name: string;
+  scopes: string[];
+  expires_on: number | null;
+  last_used_on: number | null;
+  revoked: boolean;
+  created_on: number;
+}
+
+/** Returned only at creation time; the `secret` field is the plaintext key
+ *  and is never returned again — show it to the user once and discard. */
+export interface CreatedApiKey extends ApiKey {
+  secret: string;
+}
+
 export class ApiClient {
   public baseUrl: string;
   public authToken?: string;
@@ -358,6 +387,55 @@ export class ApiClient {
   /** List all roles. */
   async listRoles(): Promise<Array<{ name: string; privileges: string[] }>> {
     return this.get("/admin/roles");
+  }
+
+  // -- Service Accounts (admin) --
+
+  async listServiceAccounts(): Promise<ServiceAccount[]> {
+    return this.get("/auth/service-accounts");
+  }
+
+  async getServiceAccount(id: string): Promise<ServiceAccount> {
+    return this.get(`/auth/service-accounts/${encodeURIComponent(id)}`);
+  }
+
+  async createServiceAccount(req: {
+    name: string;
+    description?: string;
+    roles?: string[];
+    service_role?: boolean;
+  }): Promise<ServiceAccount> {
+    return this.post("/auth/service-accounts", req);
+  }
+
+  async updateServiceAccount(
+    id: string,
+    patch: { name?: string; description?: string; roles?: string[]; disabled?: boolean },
+  ): Promise<ServiceAccount> {
+    return this.request("PATCH", `/auth/service-accounts/${encodeURIComponent(id)}`, patch);
+  }
+
+  async deleteServiceAccount(id: string): Promise<void> {
+    await this.delete(`/auth/service-accounts/${encodeURIComponent(id)}`);
+  }
+
+  async listApiKeys(accountId: string): Promise<ApiKey[]> {
+    return this.get(`/auth/service-accounts/${encodeURIComponent(accountId)}/keys`);
+  }
+
+  /** Mint a new API key. The returned `secret` is the only time the plaintext
+   *  is exposed — surface it to the user once and forget it. */
+  async createApiKey(
+    accountId: string,
+    req: { name: string; scopes?: string[]; expires_on?: number | null },
+  ): Promise<CreatedApiKey> {
+    return this.post(`/auth/service-accounts/${encodeURIComponent(accountId)}/keys`, req);
+  }
+
+  async revokeApiKey(accountId: string, keyId: string): Promise<void> {
+    await this.delete(
+      `/auth/service-accounts/${encodeURIComponent(accountId)}/keys/${encodeURIComponent(keyId)}`,
+    );
   }
 
   // -- Runtime Settings --
