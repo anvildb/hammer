@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router";
 
 type SectionId =
   | "getting-started"
@@ -25,11 +26,25 @@ type SectionId =
   | "triggers"
   | "rls"
   | "auth"
+  | "data-import"
+  | "edge-functions"
   | "observability"
   | "api"
   | "config"
-  | "browser"
-  | "drivers";
+  | "hammer"
+  | "drivers"
+  | "storage-overview"
+  | "storage-quickstart"
+  | "storage-buckets"
+  | "storage-objects"
+  | "storage-cypher"
+  | "storage-rls"
+  | "storage-signed"
+  | "storage-transforms"
+  | "storage-resumable"
+  | "storage-backends"
+  | "storage-triggers"
+  | "storage-tutorials";
 
 interface NavItem {
   id: SectionId;
@@ -68,37 +83,130 @@ const sections: NavItem[] = [
   { id: "triggers", title: "Triggers" },
   { id: "rls", title: "Row-Level Security" },
   { id: "auth", title: "Authentication" },
+  {
+    id: "storage-overview",
+    title: "File Storage",
+    children: [
+      { id: "storage-overview", title: "Overview" },
+      { id: "storage-quickstart", title: "Quickstart" },
+      { id: "storage-buckets", title: "Buckets" },
+      { id: "storage-objects", title: "Objects" },
+      { id: "storage-cypher", title: "Cypher Integration" },
+      { id: "storage-rls", title: "Row-Level Security" },
+      { id: "storage-signed", title: "Signed URLs" },
+      { id: "storage-transforms", title: "Image Transformations" },
+      { id: "storage-resumable", title: "Resumable Uploads (TUS)" },
+      { id: "storage-backends", title: "Backends" },
+      { id: "storage-triggers", title: "Triggers & Edge Functions" },
+      { id: "storage-tutorials", title: "Tutorials" },
+    ],
+  },
+  { id: "data-import", title: "Data Import" },
+  { id: "edge-functions", title: "Edge Functions" },
   { id: "observability", title: "Observability" },
   { id: "api", title: "HTTP API Reference" },
   { id: "config", title: "Configuration" },
-  { id: "browser", title: "Browser UI" },
+  { id: "hammer", title: "Hammer UI" },
   { id: "drivers", title: "Client Drivers" },
 ];
+
+// Flat ordered list of all section IDs for next/prev navigation.
+const allSectionIds: SectionId[] = sections.flatMap((s) =>
+  s.children ? s.children.map((c) => c.id) : [s.id]
+);
+
+// Map section ID to display title (including parent context).
+const sectionTitles: Record<string, string> = {};
+for (const s of sections) {
+  if (s.children) {
+    for (const c of s.children) {
+      sectionTitles[c.id] = `${s.title} > ${c.title}`;
+    }
+  } else {
+    sectionTitles[s.id] = s.title;
+  }
+}
 
 function isCypherSection(id: SectionId) {
   return id.startsWith("cypher-");
 }
+function isStorageSection(id: SectionId) {
+  return id.startsWith("storage-");
+}
+
+/**
+ * Returns the parent-group key for a section ID, or `null` for top-level
+ * entries. Used to drive the collapsible submenu state on the left-rail.
+ */
+function groupOf(id: SectionId): "cypher" | "storage" | null {
+  if (isCypherSection(id)) return "cypher";
+  if (isStorageSection(id)) return "storage";
+  return null;
+}
 
 export default function HelpRoute() {
-  const [active, setActive] = useState<SectionId>("getting-started");
+  const location = useLocation();
+  const initialSection = (location.hash?.replace("#", "") || "getting-started") as SectionId;
+  const [active, setActive] = useState<SectionId>(initialSection);
   const [cypherOpen, setCypherOpen] = useState(isCypherSection(active));
+  const [storageOpen, setStorageOpen] = useState(isStorageSection(active));
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Sync hash on section change.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${active}`);
+    }
+  }, [active]);
+
+  // Handle hash change from external navigation.
+  useEffect(() => {
+    const hash = location.hash?.replace("#", "");
+    if (hash && hash !== active) {
+      const target = hash as SectionId;
+      setActive(target);
+      if (isCypherSection(target)) setCypherOpen(true);
+      if (isStorageSection(target)) setStorageOpen(true);
+    }
+  }, [location.hash]);
 
   return (
-    <div className="flex h-full bg-zinc-950 text-zinc-100">
+    <div className="flex lg:flex-row flex-col h-full bg-zinc-950 text-zinc-100">
       {/* Sidebar TOC */}
-      <nav className="w-56 shrink-0 border-r border-zinc-800 overflow-y-auto py-4">
-        <p className="px-4 pb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <nav className="lg:w-56 w-full shrink-0 border-r border-zinc-800 overflow-y-auto">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setMobileNavOpen(!mobileNavOpen)}
+          className="lg:hidden flex items-center justify-between w-full px-4 py-3 border-b border-zinc-800 text-sm text-zinc-300"
+        >
+          <span className="font-semibold">{sectionTitles[active] || "Documentation"}</span>
+          <svg
+            className={`h-4 w-4 text-zinc-500 transition-transform ${mobileNavOpen ? "rotate-180" : ""}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        {/* Desktop: always visible. Mobile: collapsed by default. */}
+        <div className={`${mobileNavOpen ? "block" : "hidden"} lg:block py-4`}>
+        <p className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 hidden lg:block">
           Documentation
         </p>
         {sections.map((item) => {
           if (item.children) {
             const childActive = item.children.some((c) => c.id === active);
+            const group = groupOf(item.id);
+            const isOpen = group === "storage" ? storageOpen : cypherOpen;
+            const setOpen = group === "storage" ? setStorageOpen : setCypherOpen;
             return (
               <div key={item.id}>
                 <button
                   onClick={() => {
-                    const willOpen = !cypherOpen;
-                    setCypherOpen(willOpen);
+                    const willOpen = !isOpen;
+                    setOpen(willOpen);
                     if (willOpen) setActive(item.children![0].id);
                   }}
                   className={`flex items-center justify-between w-full text-left px-4 py-1.5 text-sm transition-colors ${
@@ -109,7 +217,7 @@ export default function HelpRoute() {
                 >
                   <span>{item.title}</span>
                   <svg
-                    className={`h-3 w-3 text-zinc-500 transition-transform ${cypherOpen ? "rotate-90" : ""}`}
+                    className={`h-3 w-3 text-zinc-500 transition-transform ${isOpen ? "rotate-90" : ""}`}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -118,12 +226,12 @@ export default function HelpRoute() {
                     <path d="M9 18l6-6-6-6" />
                   </svg>
                 </button>
-                {cypherOpen && (
+                {isOpen && (
                   <div>
                     {item.children.map((child) => (
                       <button
                         key={child.id}
-                        onClick={() => setActive(child.id)}
+                        onClick={() => { setActive(child.id); setMobileNavOpen(false); }}
                         className={`block w-full text-left pl-7 pr-4 py-1 text-xs transition-colors ${
                           active === child.id
                             ? "bg-zinc-800 text-zinc-100 border-l-2 border-zinc-400"
@@ -141,7 +249,7 @@ export default function HelpRoute() {
           return (
             <button
               key={item.id}
-              onClick={() => setActive(item.id)}
+              onClick={() => { setActive(item.id); setMobileNavOpen(false); }}
               className={`block w-full text-left px-4 py-1.5 text-sm transition-colors ${
                 active === item.id
                   ? "bg-zinc-800 text-zinc-100 border-l-2 border-zinc-400"
@@ -152,6 +260,7 @@ export default function HelpRoute() {
             </button>
           );
         })}
+        </div>
       </nav>
 
       {/* Content */}
@@ -181,11 +290,62 @@ export default function HelpRoute() {
           {active === "triggers" && <TriggersSection />}
           {active === "rls" && <RLSSection />}
           {active === "auth" && <AuthSection />}
+          {active === "storage-overview" && <StorageOverviewSection />}
+          {active === "storage-quickstart" && <StorageQuickstartSection />}
+          {active === "storage-buckets" && <StorageBucketsSection />}
+          {active === "storage-objects" && <StorageObjectsSection />}
+          {active === "storage-cypher" && <StorageCypherSection />}
+          {active === "storage-rls" && <StorageRLSSection />}
+          {active === "storage-signed" && <StorageSignedSection />}
+          {active === "storage-transforms" && <StorageTransformsSection />}
+          {active === "storage-resumable" && <StorageResumableSection />}
+          {active === "storage-backends" && <StorageBackendsSection />}
+          {active === "storage-triggers" && <StorageTriggersSection />}
+          {active === "storage-tutorials" && <StorageTutorialsSection />}
+          {active === "data-import" && <DataImportSection />}
+          {active === "edge-functions" && <EdgeFunctionsSection />}
           {active === "observability" && <ObservabilitySection />}
           {active === "api" && <APISection />}
           {active === "config" && <ConfigSection />}
-          {active === "browser" && <BrowserSection />}
+          {active === "hammer" && <HammerSection />}
           {active === "drivers" && <DriversSection />}
+
+          {/* Next / Previous section navigation */}
+          {(() => {
+            const idx = allSectionIds.indexOf(active);
+            const prevId = idx > 0 ? allSectionIds[idx - 1] : null;
+            const nextId = idx < allSectionIds.length - 1 ? allSectionIds[idx + 1] : null;
+            return (
+              <div className="flex items-center justify-between pt-8 mt-8 border-t border-zinc-800">
+                {prevId ? (
+                  <button
+                    onClick={() => {
+                      setActive(prevId);
+                      if (isCypherSection(prevId)) setCypherOpen(true);
+                      if (isStorageSection(prevId)) setStorageOpen(true);
+                    }}
+                    className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-200 transition-colors"
+                  >
+                    <span>&larr;</span>
+                    <span>{sectionTitles[prevId]}</span>
+                  </button>
+                ) : <div />}
+                {nextId ? (
+                  <button
+                    onClick={() => {
+                      setActive(nextId);
+                      if (isCypherSection(nextId)) setCypherOpen(true);
+                      if (isStorageSection(nextId)) setStorageOpen(true);
+                    }}
+                    className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-200 transition-colors"
+                  >
+                    <span>{sectionTitles[nextId]}</span>
+                    <span>&rarr;</span>
+                  </button>
+                ) : <div />}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -276,10 +436,7 @@ function GettingStarted() {
 
       <H2>Installation</H2>
       <Code>{`# Download and install
-curl -fsSL https://anvildb.com/install.sh | sh
-
-# Or build from source
-cargo build --release -p anvil`}</Code>
+curl -fsSL https://anvildb.com/install.sh | sh`}</Code>
 
       <H2>Quick Start</H2>
       <Code>{`# Start the server (daemonizes by default)
@@ -294,29 +451,40 @@ anvil status
 # Stop the server
 anvil stop
 
-# Open the browser UI
+# Open the Hammer UI
 open http://localhost:5175
 
 # Default login: admin / anvil`}</Code>
       <P>
         The server runs on port <InlineCode>7474</InlineCode> (HTTP API) and{" "}
-        <InlineCode>7687</InlineCode> (Bolt protocol). The browser UI runs on port{" "}
+        <InlineCode>7687</InlineCode> (Bolt protocol). The Hammer UI runs on port{" "}
         <InlineCode>5175</InlineCode>.
       </P>
 
-      <H2>Your First Query</H2>
-      <Code>{`-- Create nodes and a relationship
-CREATE (alice:Person {name: "Alice", age: 32})
-CREATE (bob:Person {name: "Bob", age: 28})
-CREATE (alice)-[:KNOWS {since: 2020}]->(bob)
+      <H2>Import Sample Data</H2>
+      <P>
+        Import the built-in sample dataset (8 people, 3 companies, 3 projects, 5 skills —
+        19 nodes, 51 relationships) to get started quickly.
+      </P>
+      <Code>{`anvil import --sample`}</Code>
 
--- Query with pattern matching
-MATCH (p:Person)-[r:KNOWS]->(friend:Person)
-WHERE p.name = "Alice"
-RETURN p.name, friend.name, r.since`}</Code>
+      <H2>Your First Query</H2>
+      <Code>{`-- Find engineers and their friends
+MATCH (p:Person:Engineer)-[r:FRIEND]->(friend)
+RETURN p.name, collect(friend.name) AS friends
+
+-- Skills per company
+MATCH (p:Person)-[:WORKS_AT]->(c:Company),
+      (p)-[:HAS_SKILL]->(s:Skill)
+RETURN c.name, collect(DISTINCT s.name) AS skills
+
+-- Mentorship chain from Carol
+MATCH path = (c:Person {name: 'Carol'})-[:MENTORS*]->(mentee)
+RETURN c.name, collect(mentee.name) AS chain`}</Code>
     </>
   );
 }
+
 
 function CypherOverviewSection() {
   return (
@@ -330,13 +498,8 @@ function CypherOverviewSection() {
       </P>
 
       <H2>Quick Example</H2>
-      <Code>{`-- Create nodes and relationships
-CREATE (alice:Person {name: "Alice", age: 32})
-CREATE (bob:Person {name: "Bob", age: 28})
-CREATE (alice)-[:KNOWS {since: 2020}]->(bob)
-
--- Query with pattern matching
-MATCH (p:Person)-[r:KNOWS]->(friend:Person)
+      <Code>{`-- Query with pattern matching
+MATCH (p:Person)-[r:FRIEND]->(friend:Person)
 WHERE p.name = "Alice"
 RETURN p.name, friend.name, r.since`}</Code>
 
@@ -363,30 +526,6 @@ RETURN p.name, friend.name, r.since`}</Code>
         ]}
       />
 
-      <H2>Comments</H2>
-      <P>
-        Anvil supports several comment styles. All comment markers are ignored inside quoted
-        strings.
-      </P>
-      <Table
-        headers={["Syntax", "Description"]}
-        rows={[
-          ["// comment", "Line comment (C-style)"],
-          ["-- comment", "Line comment (SQL-style). Note: --> is a relationship pattern, not a comment"],
-          ["# comment", "Line comment (shell-style)"],
-          ["/* comment */", "Block comment (may span multiple lines)"],
-        ]}
-      />
-      <Code>{`// This is a line comment
--- This is also a line comment
-# And so is this
-
-/* This is a
-   block comment */
-
-MATCH (a)-[r]-->(b)  // --> here is a relationship, not a comment
-RETURN a, b`}</Code>
-
       <H2>Anvil Extensions</H2>
       <P>
         Beyond standard Cypher, Anvil adds first-class support for documents, stored functions,
@@ -405,6 +544,21 @@ RETURN a, b`}</Code>
           ["EXPLAIN / PROFILE", "Query plan analysis and profiling"],
         ]}
       />
+
+      <H2>Comments</H2>
+      <P>
+        Anvil supports several comment styles in Cypher queries. All comment markers are
+        ignored inside quoted strings.
+      </P>
+      <Code>{`// C-style line comment
+-- SQL-style line comment (note: --> is a relationship pattern, not a comment)
+# Shell-style line comment
+
+/* Block comment spanning
+   multiple lines */
+
+MATCH (n) // inline comment after a clause
+RETURN n.name -- also works here`}</Code>
     </>
   );
 }
@@ -426,7 +580,7 @@ MATCH (n:Person) RETURN n
 MATCH (n:Person {name: "Alice"}) RETURN n
 
 -- Match relationship patterns
-MATCH (a:Person)-[r:KNOWS]->(b:Person)
+MATCH (a:Person)-[r:FRIEND]->(b:Person)
 RETURN a.name, b.name, r.since
 
 -- Multiple patterns (implicit join on shared variables)
@@ -435,7 +589,7 @@ MATCH (a:Person)-[:WORKS_AT]->(c:Company),
 RETURN a.name, c.name, s.name
 
 -- Undirected relationships
-MATCH (a:Person)-[:KNOWS]-(b:Person)
+MATCH (a:Person)-[:FRIEND]-(b:Person)
 RETURN a.name, b.name`}</Code>
 
       <H2>OPTIONAL MATCH</H2>
@@ -444,15 +598,15 @@ RETURN a.name, b.name`}</Code>
         unmatched parts instead of filtering out the row.
       </P>
       <Code>{`MATCH (p:Person)
-OPTIONAL MATCH (p)-[:MANAGES]->(team:Team)
-RETURN p.name, team.name`}</Code>
+OPTIONAL MATCH (p)-[:MANAGES]->(project:Project)
+RETURN p.name, project.name`}</Code>
 
       <H2>WITH</H2>
       <P>
         Chains query stages. Acts as a projection barrier — only variables listed in{" "}
         <InlineCode>WITH</InlineCode> are visible downstream.
       </P>
-      <Code>{`MATCH (p:Person)-[:KNOWS]->(f)
+      <Code>{`MATCH (p:Person)-[:FRIEND]->(f)
 WITH p, count(f) AS friendCount
 WHERE friendCount > 3
 RETURN p.name, friendCount
@@ -504,7 +658,7 @@ CREATE (a:Person {name: "Alice"}), (b:Person {name: "Bob"})
 -- Create with relationships
 CREATE (a:Person {name: "Alice"})
 CREATE (b:Person {name: "Bob"})
-CREATE (a)-[:KNOWS {since: 2020}]->(b)
+CREATE (a)-[:FRIEND {since: 2020}]->(b)
 
 -- Create everything in one pattern
 CREATE (a:Person {name: "Alice"})-[:WORKS_AT]->(c:Company {name: "Acme"})`}</Code>
@@ -522,7 +676,7 @@ RETURN n
 
 -- Merge relationships
 MATCH (a:Person {name: "Alice"}), (b:Person {name: "Bob"})
-MERGE (a)-[:KNOWS]->(b)`}</Code>
+MERGE (a)-[:FRIEND]->(b)`}</Code>
 
       <H2>SET</H2>
       <Code>{`-- Set properties
@@ -557,7 +711,7 @@ MATCH (n:Person {name: "Bob"})
 DETACH DELETE n
 
 -- Delete a relationship
-MATCH (a:Person)-[r:KNOWS]->(b:Person)
+MATCH (a:Person)-[r:FRIEND]->(b:Person)
 WHERE a.name = "Alice" AND b.name = "Bob"
 DELETE r
 
@@ -566,7 +720,7 @@ MATCH (n:TempData) DETACH DELETE n`}</Code>
 
       <H2>FOREACH</H2>
       <P>Iterate over a list and perform write operations for each element.</P>
-      <Code>{`MATCH p = (a:Person {name: "Alice"})-[:KNOWS*]->(b)
+      <Code>{`MATCH p = (a:Person {name: "Alice"})-[:FRIEND*]->(b)
 FOREACH (n IN nodes(p) | SET n.visited = true)`}</Code>
     </>
   );
@@ -613,12 +767,12 @@ RETURN n`}</Code>
       </P>
       <Code>{`-- Nodes that know Alice
 MATCH (n:Person)
-WHERE (n)-[:KNOWS]->(:Person {name: "Alice"})
+WHERE (n)-[:FRIEND]->(:Person {name: "Alice"})
 RETURN n.name
 
 -- Nodes that do NOT know anyone named Charlie
 MATCH (n:Person)
-WHERE NOT (n)-[:KNOWS]->(:Person {name: "Charlie"})
+WHERE NOT (n)-[:FRIEND]->(:Person {name: "Charlie"})
 RETURN n.name`}</Code>
 
       <H2>List Predicates</H2>
@@ -668,11 +822,11 @@ MATCH (n:Person) RETURN n.city, count(n) AS population
 ORDER BY population DESC
 
 -- Collect friends per person
-MATCH (p:Person)-[:KNOWS]->(f:Person)
+MATCH (p:Person)-[:FRIEND]->(f:Person)
 RETURN p.name, collect(f.name) AS friends
 
 -- Aggregation with WITH for filtering
-MATCH (p:Person)-[:KNOWS]->(f)
+MATCH (p:Person)-[:FRIEND]->(f)
 WITH p, count(f) AS friendCount
 WHERE friendCount > 5
 RETURN p.name, friendCount`}</Code>
@@ -699,40 +853,40 @@ function CypherPathsSection() {
         multiple hops.
       </P>
       <Code>{`-- 1 to 3 hops
-MATCH (a:Person)-[:KNOWS*1..3]->(b:Person)
+MATCH (a:Person)-[:FRIEND*1..3]->(b:Person)
 RETURN a.name, b.name
 
 -- Exactly 2 hops
-MATCH (a)-[:KNOWS*2]->(b)
+MATCH (a)-[:FRIEND*2]->(b)
 RETURN a.name, b.name
 
 -- Any length (use with caution on large graphs)
-MATCH (a:Person {name: "Alice"})-[:KNOWS*]->(b)
+MATCH (a:Person {name: "Alice"})-[:FRIEND*]->(b)
 RETURN b.name`}</Code>
 
       <H2>Quantified Paths</H2>
       <P>Anvil supports GQL-style quantified path patterns for more precise hop control.</P>
       <Code>{`-- Exactly 3 hops
-MATCH (a)-[:KNOWS]->{3}(b)
+MATCH (a)-[:FRIEND]->{3}(b)
 RETURN a.name, b.name
 
 -- Between 2 and 5 hops
-MATCH (a)-[:KNOWS]->{2,5}(b)
+MATCH (a)-[:FRIEND]->{2,5}(b)
 RETURN a.name, b.name
 
 -- One or more hops
-MATCH (a)-[:KNOWS]->+(b)
+MATCH (a)-[:FRIEND]->+(b)
 RETURN a.name, b.name`}</Code>
 
       <H2>Named Paths</H2>
       <Code>{`-- Assign a path to a variable
-MATCH p = (a:Person {name: "Alice"})-[:KNOWS*]->(b)
+MATCH p = (a:Person {name: "Alice"})-[:FRIEND*]->(b)
 RETURN p, length(p), nodes(p), relationships(p)`}</Code>
 
       <H2>Shortest Path</H2>
       <Code>{`-- Single shortest path
 MATCH path = shortestPath(
-  (a:Person {name: "Alice"})-[:KNOWS*]-(b:Person {name: "Dave"})
+  (a:Person {name: "Alice"})-[:FRIEND*]-(b:Person {name: "Dave"})
 )
 RETURN path, length(path)
 
@@ -772,7 +926,7 @@ function CypherSubqueriesSection() {
       </P>
       <Code>{`-- People who know at least one other person named Alice
 MATCH (n:Person)
-WHERE EXISTS { (n)-[:KNOWS]->(:Person {name: "Alice"}) }
+WHERE EXISTS { (n)-[:FRIEND]->(:Person {name: "Alice"}) }
 RETURN n.name
 
 -- Negated existence
@@ -784,11 +938,11 @@ RETURN n.name AS unemployed`}</Code>
       <P>Count pattern occurrences inline without a separate <InlineCode>WITH</InlineCode> stage.</P>
       <Code>{`-- Inline count in RETURN
 MATCH (n:Person)
-RETURN n.name, count{ (n)-[:KNOWS]->() } AS friendCount
+RETURN n.name, count{ (n)-[:FRIEND]->() } AS friendCount
 
 -- In WITH for filtering
 MATCH (n:Person)
-WITH n, count{ (n)-[:KNOWS]->() } AS friendCount
+WITH n, count{ (n)-[:FRIEND]->() } AS friendCount
 WHERE friendCount > 3
 RETURN n.name, friendCount`}</Code>
     </>
@@ -874,6 +1028,30 @@ DELETE DOCUMENT IN users alice
 -- Delete from namespaced collection
 DELETE DOCUMENT IN auth.refresh_tokens token_abc123`}</Code>
 
+      <H2>UPSERT DOCUMENT ... WHERE</H2>
+      <P>
+        Update documents matching a predicate. Supports sync propagation when a sync rule
+        covers the target collection.
+      </P>
+      <Code>{`-- Update all documents matching a condition
+UPSERT DOCUMENT IN profiles WHERE status = "trial"
+  SET status = "active", upgraded_at = timestamp()
+
+-- Update with multiple conditions
+UPSERT DOCUMENT IN orders WHERE region = "us" AND fulfilled = false
+  SET fulfilled = true, fulfilled_at = timestamp()`}</Code>
+
+      <H2>DELETE DOCUMENT ... WHERE</H2>
+      <P>
+        Delete all documents matching a predicate. Supports sync propagation when a sync rule
+        covers the target collection.
+      </P>
+      <Code>{`-- Delete matching documents
+DELETE DOCUMENT IN sessions WHERE expired = true
+
+-- Delete from a namespaced collection
+DELETE DOCUMENT IN auth.refresh_tokens WHERE user_id = "alice"`}</Code>
+
       <H2>SET on Documents</H2>
       <P>
         Update specific fields on matched documents using <InlineCode>SET</InlineCode>.
@@ -914,30 +1092,6 @@ RETURN p, d.joined`}</Code>
         ]}
       />
 
-      <H2>UPSERT DOCUMENT ... WHERE</H2>
-      <P>
-        Update documents matching a predicate instead of targeting a specific key. Supports
-        sync propagation when a sync rule is active on the collection.
-      </P>
-      <Code>{`-- Update all documents matching a condition
-UPSERT DOCUMENT IN profiles WHERE username = "alice"
-  SET status = "active", verified = true
-
--- With multiple conditions
-UPSERT DOCUMENT IN orders WHERE status = "pending" AND total > 100
-  SET status = "processing", updated_at = timestamp()`}</Code>
-
-      <H2>DELETE DOCUMENT ... WHERE</H2>
-      <P>
-        Delete documents matching a predicate. Like the WHERE form of UPSERT, this supports
-        sync propagation.
-      </P>
-      <Code>{`-- Delete all matching documents
-DELETE DOCUMENT IN sessions WHERE expired = true
-
--- With field comparison
-DELETE DOCUMENT IN cache WHERE created_at < timestamp() - 86400000`}</Code>
-
       <H2>Collection Features</H2>
       <Table
         headers={["Feature", "Description"]}
@@ -977,7 +1131,7 @@ CREATE FUNCTION greet(name: STRING = 'World') RETURNS STRING AS {
 
 -- Graph-reading function
 CREATE FUNCTION friend_count(person: STRING) RETURNS INT AS {
-  MATCH (p:Person {name: person})-[:KNOWS]->(f)
+  MATCH (p:Person {name: person})-[:FRIEND]->(f)
   RETURN count(f)
 }
 
@@ -1137,32 +1291,28 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
       <Table
         headers={["Function", "Description"]}
         rows={[
-          ["current_user()", "Username of the current session"],
+          ["current_user()", "UUID of the current session user"],
+          ["current_username()", "Login username of the current session"],
           ["is_sync()", "Whether the operation was sync-originated"],
           ["timestamp()", "Current epoch milliseconds"],
           ["uuid()", "Generate a new UUID v4"],
         ]}
       />
 
-      <H2>Trigger Chaining</H2>
+      <H2>Chaining, Backfill & Depth</H2>
       <P>
-        When an UPSERT DOCUMENT is executed inside a trigger body, it fires any AFTER triggers
-        defined on the target collection. This enables reactive pipelines where one trigger
-        can cascade into another.
+        Trigger chaining: an <InlineCode>UPSERT DOCUMENT</InlineCode> executed inside a
+        trigger body fires any AFTER triggers defined on the target collection.
       </P>
-
-      <H2>Trigger Backfill</H2>
       <P>
-        Creating a trigger automatically processes all existing records in its target label or
-        collection. This ensures that pre-existing data is consistent with the new trigger logic
-        without requiring a manual migration.
+        Trigger backfill: creating a new trigger automatically processes all existing
+        records in its target (label or collection), so existing data is immediately
+        consistent with the new logic.
       </P>
-
-      <H2>Execution Limits</H2>
       <P>
-        Priority ordering: lower number fires first (default 100). Recursive trigger firing is
-        capped at 16 levels deep — exceeding this limit raises an error. Use{" "}
-        <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
+        Priority ordering: lower number fires first (default 100). Recursive trigger
+        firing is capped at 16 levels deep to prevent infinite loops.
+        Use <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
       </P>
     </>
   );
@@ -1188,15 +1338,15 @@ ENABLE ROW LEVEL SECURITY ON COLLECTION profiles`}</Code>
       <H2>CREATE POLICY</H2>
       <P>
         Syntax: <InlineCode>CREATE POLICY name ON target FOR op [TO role] USING (predicate)</InlineCode>.
-        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all roles.
+        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all users.
       </P>
-      <Code>{`-- Users see only their own data (role-specific)
+      <Code>{`-- Users see only their own data
 CREATE POLICY own_data ON :Project FOR SELECT TO reader
   USING (n.owner = current_user())
 
--- Policy for all roles (TO clause omitted)
-CREATE POLICY public_read ON :Project FOR SELECT
-  USING (n.public = true)
+-- Policy without a role (applies to everyone)
+CREATE POLICY public_read ON :Post FOR SELECT
+  USING (n.published = true)
 
 -- Multi-tenant isolation
 CREATE POLICY tenant ON :Project FOR ALL TO authenticated
@@ -1211,7 +1361,7 @@ CREATE POLICY doc_own ON COLLECTION auth.users FOR SELECT TO reader
   USING (doc.owner = current_user())
 
 -- Policy on relationships
-CREATE POLICY knows_policy ON :KNOWS FOR SELECT TO reader
+CREATE POLICY knows_policy ON :FRIEND FOR SELECT TO reader
   USING (r.visible = true)`}</Code>
 
       <H2>Policy Operations</H2>
@@ -1225,21 +1375,6 @@ CREATE POLICY knows_policy ON :KNOWS FOR SELECT TO reader
           ["ALL", "Applies to all operations"],
         ]}
       />
-
-      <H2>Write Enforcement</H2>
-      <P>
-        For write operations (INSERT, UPDATE, DELETE), the USING predicate is evaluated per-node
-        or per-document before the operation is applied. SET operations check the USING predicate
-        on each target node. UPSERT DOCUMENT checks the USING predicate on each target document.
-        RLS write policies bypass RBAC role checks — any user whose data matches the predicate
-        can write, regardless of their assigned role.
-      </P>
-
-      <H2>Deny-by-Default</H2>
-      <P>
-        When RLS is enabled on a label or collection, rows with no matching policy are denied.
-        You must create at least one permissive policy for any data to be accessible.
-      </P>
 
       <H2>Management</H2>
       <Code>{`DROP POLICY name ON :Label
@@ -1255,14 +1390,24 @@ SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
         headers={["Function", "Description"]}
         rows={[
           ["current_user()", "The authenticated user's UUID"],
-          ["current_username()", "The authenticated user's login username"],
+          ["current_username()", "The authenticated login username"],
           ["session('key')", "Custom session variable (e.g., tenant_id)"],
         ]}
       />
 
-      <H2>Persistence</H2>
+      <H2>Write Enforcement</H2>
       <P>
-        RLS policies and enabled/disabled state persist across server restarts via snapshot v5.
+        RLS policies are enforced on writes as well as reads. SET operations check the
+        USING predicate per-node before applying changes. UPSERT DOCUMENT checks the
+        USING predicate per-document. Write policies bypass the RBAC role check — any
+        user whose data satisfies the predicate can write, regardless of role.
+      </P>
+
+      <H2>Behavior</H2>
+      <P>
+        Deny-by-default: when RLS is enabled on a target, queries with no matching policy
+        are denied. RLS policies and the enabled/disabled state persist across server
+        restarts (snapshot v5).
       </P>
 
       <P>
@@ -1393,13 +1538,13 @@ function CypherAnalysisSection() {
       <Code>{`EXPLAIN MATCH (n:Person) WHERE n.age > 25 RETURN n
 
 -- Complex query plan
-EXPLAIN MATCH (a:Person)-[:KNOWS]->(b:Person)-[:WORKS_AT]->(c:Company)
+EXPLAIN MATCH (a:Person)-[:FRIEND]->(b:Person)-[:WORKS_AT]->(c:Company)
 WHERE a.age > 25
 RETURN a.name, c.name`}</Code>
 
       <H2>PROFILE</H2>
       <P>Execute the query and show actual statistics (rows processed, time per operator).</P>
-      <Code>{`PROFILE MATCH (n:Person)-[:KNOWS]->(m:Person)
+      <Code>{`PROFILE MATCH (n:Person)-[:FRIEND]->(m:Person)
 RETURN n.name, m.name`}</Code>
 
       <H2>Query Analytics</H2>
@@ -1601,6 +1746,7 @@ function CypherOperatorsSection() {
   );
 }
 
+
 function GraphQLSection() {
   return (
     <>
@@ -1624,7 +1770,7 @@ function GraphQLSection() {
   }
 }`}</Code>
       <P>
-        Access the GraphQL playground from the browser UI sidebar under <strong>GraphQL</strong>.
+        Access the GraphQL playground from the Hammer UI sidebar under <strong>GraphQL</strong>.
       </P>
     </>
   );
@@ -1638,21 +1784,6 @@ function DocumentsSection() {
         Built-in NoSQL document store with collections, composite keys, TTL, secondary indexes,
         and bidirectional graph-document sync. Collections are organized into schemas:{" "}
         <InlineCode>public</InlineCode> (default) and <InlineCode>auth</InlineCode> (system).
-      </P>
-
-      <H2>Collection Management (Cypher)</H2>
-      <Code>{`-- Create a collection
-CREATE COLLECTION orders
-
--- Create only if it doesn't already exist
-CREATE COLLECTION IF NOT EXISTS orders
-
--- Drop a collection
-DROP COLLECTION orders`}</Code>
-      <P>
-        System collections in the <InlineCode>auth.*</InlineCode> namespace (e.g.{" "}
-        <InlineCode>auth.users</InlineCode>, <InlineCode>auth.roles</InlineCode>) cannot be
-        dropped.
       </P>
 
       <H2>REST API</H2>
@@ -1704,6 +1835,19 @@ MATCH DOCUMENT d IN orders WHERE d.status = "pending" RETURN d.item`}</Code>
           ["and / or", "Logical combinators"],
         ]}
       />
+
+      <H2>Collection Management (Cypher)</H2>
+      <Code>{`-- Create a collection
+CREATE COLLECTION orders
+
+-- Create only if it doesn't already exist
+CREATE COLLECTION IF NOT EXISTS orders
+
+-- Drop a collection
+DROP COLLECTION orders`}</Code>
+      <P>
+        System collections (<InlineCode>auth.*</InlineCode>) cannot be dropped.
+      </P>
     </>
   );
 }
@@ -1764,7 +1908,7 @@ CREATE FUNCTION greet(name: STRING = 'World') RETURNS STRING AS {
 
 -- Graph-reading function
 CREATE FUNCTION friend_count(person: STRING) RETURNS INT AS {
-  MATCH (p:Person {name: person})-[:KNOWS]->(f) RETURN count(f)
+  MATCH (p:Person {name: person})-[:FRIEND]->(f) RETURN count(f)
 }
 
 -- Document-reading function
@@ -1910,32 +2054,37 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
       <Table
         headers={["Function", "Description"]}
         rows={[
-          ["current_user()", "Session username"],
+          ["current_user()", "UUID of the current session user"],
+          ["current_username()", "Login username of the current session"],
           ["is_sync()", "Whether operation is sync-originated"],
           ["timestamp()", "Current epoch ms"],
           ["uuid()", "Generate a new UUID v4"],
         ]}
       />
 
-      <H2>Trigger Chaining</H2>
+      <H2>Sync Runs Before AFTER Triggers</H2>
       <P>
-        When an UPSERT DOCUMENT is executed inside a trigger body, it fires any AFTER triggers
-        defined on the target collection. This enables reactive pipelines where one trigger
-        can cascade into another.
+        On a collection write (REST <InlineCode>PUT /docs/&#123;collection&#125;/&#123;id&#125;</InlineCode>{" "}
+        or <InlineCode>DELETE</InlineCode>), the sync engine projects the
+        document into the graph <em>before</em> any AFTER INSERT / UPDATE /
+        DELETE trigger fires. Trigger bodies can therefore <InlineCode>MATCH</InlineCode>{" "}
+        the synced node and rely on it being present (or absent, for deletes)
+        — there's no race against the sync pass.
       </P>
 
-      <H2>Trigger Backfill</H2>
+      <H2>Chaining, Backfill & Depth</H2>
       <P>
-        Creating a trigger automatically processes all existing records in its target label or
-        collection. Pre-existing data is made consistent with the new trigger logic without
-        requiring a manual migration.
+        Trigger chaining: an <InlineCode>UPSERT DOCUMENT</InlineCode> executed inside a
+        trigger body fires any AFTER triggers defined on the target collection.
       </P>
-
-      <H2>Execution Limits</H2>
       <P>
-        Priority ordering (lower = first, default 100). Recursive trigger firing is capped at
-        16 levels deep — exceeding this limit raises an error. Use{" "}
-        <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
+        Trigger backfill: creating a new trigger automatically processes all existing
+        records in its target, so existing data is immediately consistent with the new logic.
+      </P>
+      <P>
+        Priority ordering (lower = first, default 100). Recursive trigger firing is capped
+        at 16 levels deep to prevent infinite loops.
+        Use <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
         <InlineCode>UPSERT DOCUMENT</InlineCode> only updates specified fields — existing fields are preserved.
       </P>
     </>
@@ -1958,15 +2107,15 @@ function RLSSection() {
       <H2>Create Policies</H2>
       <P>
         Syntax: <InlineCode>CREATE POLICY name ON target FOR op [TO role] USING (predicate)</InlineCode>.
-        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all roles.
+        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all users.
       </P>
-      <Code>{`-- Users see only their own data (role-specific)
+      <Code>{`-- Users see only their own data
 CREATE POLICY own_data ON :Project FOR SELECT TO reader
   USING (n.owner = current_user())
 
--- Policy for all roles (TO clause omitted)
-CREATE POLICY public_read ON :Project FOR SELECT
-  USING (n.public = true)
+-- Policy without a role (applies to everyone)
+CREATE POLICY public_read ON :Post FOR SELECT
+  USING (n.published = true)
 
 -- Multi-tenant isolation
 CREATE POLICY tenant ON :Project FOR ALL TO authenticated
@@ -1981,7 +2130,7 @@ CREATE POLICY no_secret ON :Document FOR SELECT TO reader
         headers={["Function", "Description"]}
         rows={[
           ["current_user()", "The authenticated user's UUID"],
-          ["current_username()", "The authenticated user's login username"],
+          ["current_username()", "The authenticated login username"],
           ["session('key')", "Custom session variable (e.g., tenant_id)"],
         ]}
       />
@@ -1989,14 +2138,15 @@ CREATE POLICY no_secret ON :Document FOR SELECT TO reader
       <H2>Write Enforcement</H2>
       <P>
         SET operations check the USING predicate per-node before applying changes.
-        UPSERT DOCUMENT checks the USING predicate per-document. RLS write policies bypass
-        RBAC role checks — any user whose data matches the predicate can write.
+        UPSERT DOCUMENT checks the USING predicate per-document. Write policies bypass
+        the RBAC role check — any user whose data satisfies the predicate can write.
       </P>
 
-      <H2>Deny-by-Default</H2>
+      <H2>Behavior</H2>
       <P>
-        When RLS is enabled, rows with no matching policy are denied. You must create at least
-        one permissive policy for any data to be accessible.
+        Deny-by-default: when RLS is enabled, no matching policy means the operation is
+        denied. Policies and the enabled/disabled state persist across server restarts
+        (snapshot v5).
       </P>
 
       <H2>Sync Pairs</H2>
@@ -2011,11 +2161,6 @@ SHOW POLICIES
 SHOW POLICIES ON :Label
 ENABLE / DISABLE / FORCE ROW LEVEL SECURITY ON :Label
 SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
-
-      <H2>Persistence</H2>
-      <P>
-        RLS policies and enabled/disabled state persist across server restarts via snapshot v5.
-      </P>
     </>
   );
 }
@@ -2058,6 +2203,81 @@ POST /auth/change-password -- { old_password, new_password }`}</Code>
           ["Forced password change", "Default admin must change password on first login"],
         ]}
       />
+
+      <H2>Service Accounts & API Keys</H2>
+      <P>
+        Long-lived credentials for CI, scripts, and machine clients. A
+        service account holds a role set and zero or more API keys; each key
+        can narrow that role set with a scope allowlist and may be revoked
+        independently of the account.
+      </P>
+      <Code>{`# Create the account
+curl -X POST http://localhost:7474/auth/service-accounts \\
+  -H "Authorization: Bearer $ADMIN_JWT" \\
+  -d '{"name": "ci-bot", "roles": ["editor"]}'
+
+# Mint a key — the plaintext is returned ONCE, only stored as a hash after
+curl -X POST http://localhost:7474/auth/service-accounts/$ID/keys \\
+  -H "Authorization: Bearer $ADMIN_JWT" \\
+  -d '{"name": "github-actions"}'
+# => { "key": "anvil_sk_...", "key_id": "...", "prefix": "anvil_sk_xxxxxx" }
+
+# Use the key like any Bearer token
+curl http://localhost:7474/db/query \\
+  -H "Authorization: Bearer anvil_sk_..." \\
+  -d '{"query": "MATCH (n) RETURN n"}'`}</Code>
+      <Table
+        headers={["Capability", "Detail"]}
+        rows={[
+          ["Key prefix", "anvil_sk_ — the auth middleware uses this to distinguish keys from JWTs"],
+          ["Storage", "auth.service_accounts and auth.api_keys collections (admin-only writes)"],
+          ["Scopes", "Per-key allowlist; intersected with the account's roles at request time"],
+          ["service_role", "Capability flag that bypasses RLS when both the account and key scope allow it"],
+          ["Auditing", "AuthEvents emitted on create / use / revoke (prefix-only, never logs the secret)"],
+          ["Throttled last-used", "last_used_on updates are coalesced to avoid write amplification"],
+        ]}
+      />
+
+      <H2>Email Delivery (SMTP)</H2>
+      <P>
+        Verification, OTP, and password-reset emails ship through a built-in SMTP
+        client with TLS. Configure under <InlineCode>[auth.email]</InlineCode> in{" "}
+        <InlineCode>anvil.toml</InlineCode>, override via{" "}
+        <InlineCode>ANVIL_SMTP_*</InlineCode> env vars, or hot-reload through{" "}
+        <InlineCode>system.settings</InlineCode>.
+      </P>
+      <Code>{`[auth.email]
+smtp_host = "smtp.resend.com"
+smtp_port = 465                  # 465 = implicit TLS, 587 = STARTTLS
+smtp_user = "resend"
+smtp_pass = "re_xxxxxxxxxxxxxxxx"
+smtp_from = "Anvil DB <noreply@example.com>"
+smtp_starttls = true             # only consulted when port != 465`}</Code>
+
+      <H3>TLS Modes</H3>
+      <Table
+        headers={["Port", "Mode", "When to use"]}
+        rows={[
+          ["465", "Implicit TLS", "Resend, Mailgun TLS endpoints — handshake happens before SMTP"],
+          ["587", "STARTTLS upgrade", "Gmail, Office 365, most relays — plaintext greeting then upgrade"],
+          ["25 / other", "Plaintext", "Dev-only — set smtp_starttls=false to opt in"],
+        ]}
+      />
+      <P>
+        TLS uses <InlineCode>tokio-rustls</InlineCode> with Mozilla's
+        webpki-roots trust store. SMTP replies are parsed across multi-line
+        <InlineCode>250-</InlineCode> capability lists, and message bodies are
+        dot-stuffed (RFC 5321 §4.5.2) so payload lines beginning with{" "}
+        <InlineCode>.</InlineCode> don't terminate the DATA section early.
+      </P>
+
+      <H3>Webhook Alternative</H3>
+      <P>
+        Set <InlineCode>ANVIL_EMAIL_WEBHOOK_URL</InlineCode> (or{" "}
+        <InlineCode>webhook_url</InlineCode> in the config) to POST email
+        payloads as JSON to an external provider instead of speaking SMTP
+        directly. Useful when an outbound TCP relay isn't an option.
+      </P>
     </>
   );
 }
@@ -2132,9 +2352,11 @@ function APISection() {
           ["GET", "/", "Server info"],
           ["GET", "/health", "Health check"],
           ["POST", "/db/query", "Execute Cypher query"],
+          ["POST", "/db/import/cypher", "Import a Cypher script (admin/editor)"],
           ["GET", "/db/{name}/schema", "Get database schema"],
           ["GET", "/db/{name}/graph", "Get full graph data"],
           ["POST", "/graphql", "GraphQL endpoint"],
+          ["ANY", "/functions/v1/{name}", "Invoke a stored edge function"],
         ]}
       />
 
@@ -2146,7 +2368,37 @@ function APISection() {
           ["POST", "/auth/refresh", "Refresh access token"],
           ["POST", "/auth/register", "Register new user"],
           ["POST", "/auth/change-password", "Change password"],
+          ["GET", "/auth/verify", "Verify email via token query param"],
+          ["POST", "/auth/resend-verification", "Resend the verification email"],
+          ["POST", "/auth/otp/request", "Request a 6-digit OTP for an email"],
+          ["POST", "/auth/otp/verify", "Verify OTP, returns JWT tokens"],
           ["GET", "/.well-known/jwks.json", "JWKS public keys"],
+        ]}
+      />
+
+      <H2>Service Accounts (admin)</H2>
+      <Table
+        headers={["Method", "Endpoint", "Description"]}
+        rows={[
+          ["POST", "/auth/service-accounts", "Create service account"],
+          ["GET", "/auth/service-accounts", "List service accounts"],
+          ["GET", "/auth/service-accounts/{id}", "Get one"],
+          ["PATCH", "/auth/service-accounts/{id}", "Update name / roles"],
+          ["DELETE", "/auth/service-accounts/{id}", "Delete account (revokes all keys)"],
+          ["POST", "/auth/service-accounts/{id}/keys", "Mint a new API key (plaintext returned once)"],
+          ["GET", "/auth/service-accounts/{id}/keys", "List keys for an account"],
+          ["DELETE", "/auth/service-accounts/{id}/keys/{key_id}", "Revoke an API key"],
+        ]}
+      />
+
+      <H2>System Settings (admin)</H2>
+      <Table
+        headers={["Method", "Endpoint", "Description"]}
+        rows={[
+          ["GET", "/system/settings", "List all runtime settings"],
+          ["GET", "/system/settings/{key}", "Get one setting"],
+          ["PUT", "/system/settings/{key}", "Update one (hot-reload, no restart)"],
+          ["DELETE", "/system/settings/{key}", "Reset to file / env / default"],
         ]}
       />
 
@@ -2187,8 +2439,54 @@ function ConfigSection() {
     <>
       <H1>Configuration</H1>
       <P>
-        Settings are resolved in order: CLI flags &gt; environment variables &gt; config file &gt; defaults.
+        Settings are resolved in order: <strong>runtime</strong> (system.settings collection) &gt;
+        CLI flags &gt; environment variables &gt; config file &gt; defaults.
+        Config file search order: <InlineCode>./anvil.toml</InlineCode> (local), then{" "}
+        <InlineCode>/etc/anvil/anvil.toml</InlineCode> (system install on Linux/macOS) or{" "}
+        <InlineCode>%LOCALAPPDATA%\Anvil\anvil.toml</InlineCode> (Windows).
       </P>
+
+      <H2>Runtime Settings (system.settings)</H2>
+      <P>
+        Most auth, email, storage, and observability knobs can be hot-reloaded
+        through the <InlineCode>system.settings</InlineCode> document collection
+        without restarting the server. Runtime values take the highest precedence
+        and are persisted in the snapshot, so they survive restarts.
+      </P>
+      <Code>{`# Read all settings
+curl http://localhost:7474/system/settings -H "Authorization: Bearer $JWT"
+
+# Update one (admin only) — takes effect immediately
+curl -X PUT http://localhost:7474/system/settings/auth.email.smtp_host \\
+  -H "Authorization: Bearer $ADMIN_JWT" \\
+  -d '{"value": "smtp.resend.com"}'
+
+# Reset to file / env / default
+curl -X DELETE http://localhost:7474/system/settings/auth.email.smtp_host \\
+  -H "Authorization: Bearer $ADMIN_JWT"`}</Code>
+      <P>
+        Or edit through the Hammer Admin page. Each setting carries{" "}
+        <InlineCode>category</InlineCode>, <InlineCode>type</InlineCode>,{" "}
+        <InlineCode>description</InlineCode>, and an audit trail{" "}
+        (<InlineCode>updated_at</InlineCode>, <InlineCode>updated_by</InlineCode>).
+      </P>
+
+      <H2>System Install Paths</H2>
+      <P>
+        When installed via <InlineCode>install.sh</InlineCode> or <InlineCode>install.ps1</InlineCode>,
+        Anvil uses system paths automatically:
+      </P>
+      <Table
+        headers={["", "Linux / macOS", "Windows"]}
+        rows={[
+          ["Config", "/etc/anvil/anvil.toml", "%LOCALAPPDATA%\\Anvil\\anvil.toml"],
+          ["Data", "/var/lib/anvil/", "%LOCALAPPDATA%\\Anvil\\data\\"],
+          ["Logs", "/var/log/anvil/anvil.log", "%LOCALAPPDATA%\\Anvil\\log\\anvil.log"],
+          ["Plugins", "/var/lib/anvil/plugins/", "%LOCALAPPDATA%\\Anvil\\data\\plugins\\"],
+        ]}
+      />
+      <P>For local development builds (<InlineCode>cargo run</InlineCode>), paths default to <InlineCode>./data</InlineCode>, <InlineCode>./plugins</InlineCode>, and stdout logging.</P>
+
       <H2>Generate Config</H2>
       <Code>{`anvil config init     # Write default anvil.toml
 anvil config          # Print effective config`}</Code>
@@ -2210,10 +2508,26 @@ enabled = true
 default_password = "anvil"
 access_token_ttl_secs = 3600    # 1 hour
 refresh_token_ttl_secs = 604800 # 7 days
+require_email_verification = false
 # RSA key pair auto-generated -> data/jwt_key.pem
+
+[auth.email]
+# Empty smtp_host disables email; verification / OTP become no-ops
+smtp_host = ""
+smtp_port = 465                 # 465 = implicit TLS, 587 = STARTTLS
+smtp_user = ""
+smtp_pass = ""
+smtp_from = ""
+smtp_starttls = true            # only consulted when port != 465
+webhook_url = ""                # optional HTTP webhook instead of SMTP
+otp_ttl_secs = 300
+otp_max_attempts = 3
+verification_ttl_secs = 86400
+template_dir = "data/templates"
 
 [logging]
 level = "info"
+log_file = ""                   # empty = stdout (daemon uses data/anvil.log)
 slow_query_threshold_ms = 1000`}</Code>
 
       <H2>TLS / HTTPS</H2>
@@ -2230,6 +2544,7 @@ tls_key = "/etc/letsencrypt/live/example.com/privkey.pem"
 # ANVIL_TLS_KEY=/etc/anvil/privkey.pem`}</Code>
 
       <H2>Environment Variables</H2>
+      <H3>Server &amp; storage core</H3>
       <Table
         headers={["Variable", "Default"]}
         rows={[
@@ -2237,6 +2552,7 @@ tls_key = "/etc/letsencrypt/live/example.com/privkey.pem"
           ["ANVIL_BOLT_PORT", "7687"],
           ["ANVIL_DATA_DIR", "./data"],
           ["ANVIL_LOG_LEVEL", "info"],
+          ["ANVIL_LOG_FILE", "(empty = stdout)"],
           ["ANVIL_AUTH_ENABLED", "true"],
           ["ANVIL_DOCUMENT_STORAGE", "unified"],
           ["ANVIL_SLOW_QUERY_THRESHOLD", "1000"],
@@ -2244,23 +2560,57 @@ tls_key = "/etc/letsencrypt/live/example.com/privkey.pem"
           ["ANVIL_TLS_KEY", "(not set)"],
         ]}
       />
+      <H3>File storage (Phase 25)</H3>
+      <Table
+        headers={["Variable", "Default", "Notes"]}
+        rows={[
+          ["ANVIL_STORAGE_BACKEND", "local", "local | s3 | gcs | azure"],
+          ["ANVIL_STORAGE_LOCAL_ROOT", "./data/storage", "Content-addressed blob root"],
+          ["ANVIL_STORAGE_STAGING_DIR", "./data/staging", "Temp uploads"],
+          ["ANVIL_STORAGE_SIGNING_KEY_PATH", "./data/storage_signing_key.pem", "HMAC key for signed URLs"],
+          ["ANVIL_STORAGE_SIGNED_URL_DEFAULT_TTL", "1h", "Used when expires_in=0"],
+          ["ANVIL_STORAGE_SIGNED_URL_MAX_TTL", "24h", "Server-side clamp"],
+          ["ANVIL_STORAGE_UPLOAD_CHUNK_SIZE", "5MiB", "TUS chunk advertised in OPTIONS"],
+          ["ANVIL_STORAGE_UPLOAD_EXPIRY", "24h", "Resumable session lifetime"],
+          ["ANVIL_STORAGE_LOG_OBJECT_ACCESS", "false", "Emit StorageObjectAccessed events"],
+          ["ANVIL_STORAGE_MAX_FILE_SIZE", "50MiB", "Per-object hard ceiling"],
+          ["ANVIL_STORAGE_MAX_TOTAL_STORAGE", "0", "0 = no global cap"],
+          ["ANVIL_STORAGE_MAX_USER_STORAGE", "0", "Per-:auth.User cap; 0 = unlimited"],
+          ["ANVIL_STORAGE_IMAGE_CACHE_DIR", "./data/image_cache", "Variant cache root"],
+          ["ANVIL_STORAGE_IMAGE_MAX_CACHE_SIZE", "2GiB", "On-disk cache budget"],
+          ["ANVIL_STORAGE_IMAGE_MAX_DIMENSION", "4096", "Reject larger width/height"],
+          ["ANVIL_STORAGE_IMAGE_ALLOWED_FORMATS", "webp,jpeg,png,avif", "Output encoder allow-list"],
+        ]}
+      />
+      <H3>S3 / R2 / MinIO (when ANVIL_STORAGE_BACKEND=s3)</H3>
+      <Table
+        headers={["Variable", "Notes"]}
+        rows={[
+          ["ANVIL_S3_KEY", "Access key ID"],
+          ["ANVIL_S3_SECRET", "Secret access key"],
+          ["ANVIL_S3_REGION", "AWS region (e.g. us-east-1)"],
+          ["ANVIL_S3_BUCKET", "Backing bucket name"],
+          ["ANVIL_S3_ENDPOINT", "Custom endpoint for R2 / MinIO / Wasabi"],
+        ]}
+      />
 
       <H2>CLI Commands</H2>
-      <Code>{`anvil start                    # Daemon mode (default)
+      <Code>{`anvil start                    # Daemon mode (logs to data/anvil.log)
 anvil start --foreground       # Foreground mode
 anvil stop                     # Graceful shutdown
 anvil status                   # Show running state
-anvil start --http-port 8080   # Override config`}</Code>
+anvil start --http-port 8080   # Override config
+anvil import cypher ./data.cypher  # Import Cypher script`}</Code>
     </>
   );
 }
 
-function BrowserSection() {
+function HammerSection() {
   return (
     <>
-      <H1>Browser UI</H1>
+      <H1>Hammer UI</H1>
       <P>
-        The browser UI runs on port 5175 and provides a complete interface for managing your database.
+        The Hammer UI runs on port 5175 and provides a complete interface for managing your database.
       </P>
 
       <H2>Pages</H2>
@@ -2269,14 +2619,16 @@ function BrowserSection() {
         rows={[
           ["Cypher", "Query editor with Table/JSON/Graph view, Cmd+Enter to execute"],
           ["GraphQL", "GraphQL playground with introspection"],
-          ["Graph", "Force-directed visualization, right-click menus, expand neighbors, edit properties"],
+          ["Graph", "Force-directed visualization with focus mode, neighbor orbit, lasso select, minimap, PNG/SVG export"],
           ["Schema", "Labels, relationship types, property keys, indexes"],
           ["Documents", "Collection CRUD, document browsing, sync rule management"],
+          ["Storage", "Bucket browser, upload, image preview, signed URLs, resumable uploads"],
           ["Policies", "RLS policy management, enable/disable, simulator"],
           ["Functions", "Create/edit/delete stored functions, test execution panel, call log"],
           ["Triggers", "Create/edit triggers, enable/disable, activity log, dependency analysis"],
+          ["Import", "Cypher script import via paste or file upload, shows nodes/relationships created"],
           ["Monitor", "Server stats, slow query log, event log"],
-          ["Admin", "User/role management, event log explorer, alerts panel"],
+          ["Admin", "User/role management, service accounts & API keys, event log explorer, runtime settings"],
           ["Settings", "Theme, editor preferences, graph defaults"],
           ["Help", "This documentation page"],
         ]}
@@ -2284,15 +2636,125 @@ function BrowserSection() {
 
       <H2>Schema Dropdown</H2>
       <P>
-        Switch between <InlineCode>public</InlineCode> and <InlineCode>auth</InlineCode> schemas
-        in the sidebar. Schema-aware pages filter content by the selected schema.
+        Switch between <InlineCode>public</InlineCode>, <InlineCode>auth</InlineCode>, and{" "}
+        <InlineCode>system</InlineCode> schemas in the sidebar. Schema-aware pages filter
+        content by the selected schema. The <InlineCode>auth</InlineCode> schema is only
+        visible to admin users; <InlineCode>storage</InlineCode> collections are owned by
+        the storage subsystem and managed through the Storage page.
       </P>
 
       <H2>Graph Visualization</H2>
       <P>
-        Force-directed layout with D3.js. Double-click nodes to expand neighbors. Right-click for
-        edit/delete context menus. Per-label caption properties stored in localStorage.
+        Force-directed layout with D3.js. Click a node to enter focus mode — direct
+        connections orbit in an evenly-spaced circle with yellow highlighted edges and labels,
+        while non-neighbors are pushed to the periphery with hidden labels. Double-click to
+        expand neighbors. Shift+drag for lasso selection. Right-click for edit/delete context
+        menus. Layouts: force, hierarchical, circular, grid. Export as PNG or SVG.
       </P>
+    </>
+  );
+}
+
+function DataImportSection() {
+  return (
+    <>
+      <H1>Data Import</H1>
+      <P>
+        Import Neo4j-compatible Cypher scripts via CLI, REST API, or the Hammer UI.
+        Supports semicolon-separated statements, multi-CREATE without semicolons,
+        MERGE with ON CREATE SET, and variable binding across CREATE clauses.
+      </P>
+
+      <H2>CLI Import</H2>
+      <Code>{`anvil import cypher ./movies.cypher`}</Code>
+
+      <H2>REST API Import</H2>
+      <Code>{`curl -X POST http://localhost:7474/db/import/cypher \\
+  -H "Content-Type: text/plain" \\
+  -H "Authorization: Bearer $TOKEN" \\
+  --data-binary @movies.cypher
+
+# Response:
+# {
+#   "total": 2,
+#   "success": 2,
+#   "nodesCreated": 171,
+#   "relationshipsCreated": 253,
+#   "errors": []
+# }`}</Code>
+
+      <H2>Hammer UI</H2>
+      <P>
+        Navigate to the <InlineCode>Import</InlineCode> page. Paste a Cypher script or
+        upload a <InlineCode>.cypher</InlineCode> file. The result displays statements
+        executed, nodes created, and relationships created.
+      </P>
+
+      <H2>Supported Formats</H2>
+      <Table
+        headers={["Format", "Description"]}
+        rows={[
+          ["Semicolon-separated", "Standard format: each statement ends with ;"],
+          ["Multi-CREATE (no semicolons)", "Neo4j initialDatabase.cypher format with variable binding across CREATEs"],
+          ["MERGE", "MERGE with ON CREATE SET / ON MATCH SET for upserts"],
+          ["MATCH + MERGE", "MATCH to bind variables, then MERGE relationships"],
+        ]}
+      />
+
+      <H2>Automatic Skipping</H2>
+      <P>
+        The import engine automatically skips unsupported DDL (<InlineCode>CREATE CONSTRAINT</InlineCode>,{" "}
+        <InlineCode>CREATE INDEX</InlineCode>) and standalone <InlineCode>MATCH</InlineCode> without
+        RETURN/SET/DELETE/MERGE. These count as successful in the response.
+      </P>
+    </>
+  );
+}
+
+function EdgeFunctionsSection() {
+  return (
+    <>
+      <H1>Edge Functions</H1>
+      <P>
+        Run JavaScript or TypeScript on the server, triggered via HTTP endpoints.
+        Functions execute in a Deno or Node.js subprocess with on-demand startup.
+      </P>
+
+      <H2>Create an Edge Function</H2>
+      <Code>{`CREATE EDGE FUNCTION hello
+RUNTIME 'deno'
+ENTRYPOINT 'functions/hello.ts'`}</Code>
+
+      <H2>Function File</H2>
+      <Code>{`// functions/hello.ts
+Deno.serve((req: Request) => {
+  const url = new URL(req.url);
+  const name = url.searchParams.get("name") ?? "World";
+  return new Response(
+    JSON.stringify({ message: \`Hello, \${name}!\` }),
+    { headers: { "Content-Type": "application/json" } }
+  );
+});`}</Code>
+
+      <H2>Invoke</H2>
+      <Code>{`curl http://localhost:7474/edge/hello?name=Alice
+# {"message": "Hello, Alice!"}`}</Code>
+
+      <H2>Management</H2>
+      <Code>{`-- List all edge functions
+SHOW EDGE FUNCTIONS
+
+-- Drop an edge function
+DROP EDGE FUNCTION hello`}</Code>
+
+      <H2>Runtimes</H2>
+      <Table
+        headers={["Runtime", "Command", "Notes"]}
+        rows={[
+          ["deno", "deno run --allow-net", "Recommended; secure by default"],
+          ["node", "node", "Requires Node.js on PATH"],
+        ]}
+      />
     </>
   );
 }
@@ -2325,6 +2787,921 @@ result = client.query("MATCH (n) RETURN n LIMIT 10")`}</Code>
       <H2>Go</H2>
       <Code>{`client, err := anvil.Connect("anvil://localhost:7687")
 result, err := client.Query("MATCH (n) RETURN n LIMIT 10")`}</Code>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  File Storage sections (Phase 25.16)                                */
+/* ------------------------------------------------------------------ */
+
+function StorageOverviewSection() {
+  return (
+    <>
+      <H1>File Storage — Overview</H1>
+      <P>
+        Anvil bundles an object/blob store directly inside the database
+        binary, so deployments don't need a sidecar S3/MinIO instance. Files
+        live as <InlineCode>:storage.Object</InlineCode> nodes in the system{" "}
+        <InlineCode>storage</InlineCode> schema; binary content is held by a
+        pluggable backend (local FS by default, optionally AWS S3, Cloudflare
+        R2, MinIO, Google Cloud Storage, or Azure Blob).
+      </P>
+      <P>
+        Modeled after Supabase Storage but graph-native: buckets and files
+        are first-class graph entities, so they participate in Cypher
+        queries, relationships, row-level security policies, triggers, and
+        edge functions.
+      </P>
+
+      <H2>Architecture</H2>
+      <P>
+        The storage subsystem has three layers:
+      </P>
+      <Table
+        headers={["Layer", "Responsibility", "Examples"]}
+        rows={[
+          ["Graph", "Bucket / Object metadata as nodes", ":storage.Bucket, :storage.Object"],
+          ["Refcount", "Content-addressed dedup + lifetime", "RefCounter::incref/decref"],
+          ["Backend", "Bytes on disk or in the cloud", "LocalBackend, S3Backend"],
+        ]}
+      />
+      <P>
+        Backend blobs are content-addressed (SHA-256). Two objects with
+        identical bytes share one backend file — uploading the same image
+        twice is free after the first time.
+      </P>
+
+      <H2>How it compares</H2>
+      <Table
+        headers={["Feature", "Anvil Storage", "S3 / R2", "Supabase Storage"]}
+        rows={[
+          ["Built-in to DB", "Yes", "No", "Postgres extension"],
+          ["Graph-native", "Yes (Cypher MATCH)", "No", "Partial (SQL)"],
+          ["RLS for objects", "Native", "IAM only", "Native"],
+          ["Signed URLs", "HMAC, bucket-versioned", "Pre-signed", "JWT-based"],
+          ["Image transform", "Built-in", "External (Lambda)", "Pro tier"],
+          ["Resumable upload", "TUS 1.0.0", "Multipart", "TUS"],
+          ["Content dedup", "Refcounted", "No", "No"],
+        ]}
+      />
+
+      <H2>What's in the box</H2>
+      <Table
+        headers={["Component", "Surface"]}
+        rows={[
+          ["REST API", "/storage/v1/bucket, /storage/v1/object, /storage/v1/upload/resumable, /storage/v1/render"],
+          ["Cypher DDL", "CREATE BUCKET, ALTER BUCKET, DROP BUCKET, SHOW BUCKETS"],
+          ["Cypher helpers", "file_url, signed_url, file_size, file_mime, bucket_size, image_metadata"],
+          ["Triggers", "BEFORE/AFTER INSERT/UPDATE/DELETE on :storage.Object"],
+          ["Client SDKs", "anvilent for Rust / TypeScript / Python / Go"],
+          ["CLI", "anvil storage create-bucket / upload / download / ls / rm / sign / usage / gc"],
+          ["Hammer UI", "/storage panel with browser, upload, preview, signed URLs"],
+        ]}
+      />
+    </>
+  );
+}
+
+function StorageQuickstartSection() {
+  return (
+    <>
+      <H1>File Storage — Quickstart</H1>
+      <P>
+        Create a bucket, upload a file, and download it — start to finish
+        in under five minutes. The examples below assume a running server
+        at <InlineCode>localhost:7474</InlineCode> with default config.
+      </P>
+
+      <H2>1. Create a bucket</H2>
+      <Code>{`# CLI
+anvil storage create-bucket avatars --public --max-size 5MB
+
+# Or via Cypher (in the Hammer UI or anvilent shell)
+CREATE BUCKET avatars
+  PUBLIC = true,
+  FILE_SIZE_LIMIT = 5242880`}</Code>
+
+      <H2>2. Upload an object</H2>
+      <Code>{`# CLI
+anvil storage upload ./alice.png avatars/alice.png
+
+# Or via curl
+curl -X POST \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: image/png" \\
+  --data-binary @alice.png \\
+  http://localhost:7474/storage/v1/object/avatars/alice.png`}</Code>
+
+      <H2>3. Download or share</H2>
+      <Code>{`# Public bucket: permanent URL, no auth needed.
+curl http://localhost:7474/storage/v1/object/public/avatars/alice.png -o alice.png
+
+# Private bucket: mint a signed URL with 1-hour TTL.
+anvil storage sign avatars/alice.png --ttl 1h
+
+# Or from code (TypeScript):
+const { signedUrl } = await client.storage
+  .from("avatars")
+  .createSignedUrl("alice.png", 3600);`}</Code>
+
+      <H2>4. (Optional) inspect usage</H2>
+      <Code>{`anvil storage usage
+
+# Example output:
+# Total: 1 object, 4.21 KiB
+#
+# By bucket:
+#   avatars                  1            4.21 KiB`}</Code>
+
+      <P>
+        Next: read the dedicated pages on{" "}
+        <InlineCode>buckets</InlineCode>, <InlineCode>objects</InlineCode>,{" "}
+        <InlineCode>signed URLs</InlineCode>, and{" "}
+        <InlineCode>image transformations</InlineCode> for the details.
+      </P>
+    </>
+  );
+}
+
+function StorageBucketsSection() {
+  return (
+    <>
+      <H1>Buckets</H1>
+      <P>
+        A bucket is a logical container for objects. Each bucket carries a
+        public/private flag, optional per-file size cap, optional total
+        bucket size cap, an allow-list of MIME types, and an owner. Buckets
+        are <InlineCode>:storage.Bucket</InlineCode> nodes — visible to
+        Cypher, GraphQL, and RLS like any other graph entity.
+      </P>
+
+      <H2>Public vs Private</H2>
+      <P>
+        A <InlineCode>public: true</InlineCode> bucket serves objects via{" "}
+        <InlineCode>GET /storage/v1/object/public/{`{bucket}/{path}`}</InlineCode>{" "}
+        with no authentication. Flipping a bucket to private (or revoking
+        its signing version) is the kill-switch for sharing.
+      </P>
+      <Code>{`# Toggle private at any time:
+ALTER BUCKET avatars SET PUBLIC = false;
+
+# Or via REST:
+curl -X PUT -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"public": false}' \\
+  http://localhost:7474/storage/v1/bucket/avatars`}</Code>
+
+      <H2>Size limits</H2>
+      <Table
+        headers={["Field", "Scope", "Notes"]}
+        rows={[
+          ["file_size_limit", "Per object", "Rejects upload with 413 if Content-Length exceeds"],
+          ["bucket_size_limit", "Sum across bucket", "Pre-flight + atomic check at write time"],
+          ["max_file_size", "Global (config)", "Server-wide ceiling (anvil.toml)"],
+          ["max_total_storage", "Global (config)", "Storage cap across every bucket"],
+          ["max_user_storage", "Per user", "Tracked via :auth.User.storage_used"],
+        ]}
+      />
+
+      <H2>Allowed MIME types</H2>
+      <P>
+        If <InlineCode>allowed_mime_types</InlineCode> is non-empty, uploads
+        with a <InlineCode>Content-Type</InlineCode> outside the list are
+        rejected with 415.
+      </P>
+      <Code>{`CREATE BUCKET avatars
+  PUBLIC = true,
+  FILE_SIZE_LIMIT = 5242880,
+  ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];`}</Code>
+
+      <H2>REST surface</H2>
+      <Table
+        headers={["Method", "Path", "Use"]}
+        rows={[
+          ["POST", "/storage/v1/bucket", "Create"],
+          ["GET", "/storage/v1/bucket", "List visible buckets"],
+          ["GET", "/storage/v1/bucket/{id}", "Fetch one"],
+          ["PUT", "/storage/v1/bucket/{id}", "Update settings"],
+          ["DELETE", "/storage/v1/bucket/{id}", "Drop (must be empty)"],
+          ["POST", "/storage/v1/bucket/{id}/empty", "Delete every object inside"],
+          ["POST", "/storage/v1/bucket/{id}/sign-revoke", "Invalidate signed URLs"],
+        ]}
+      />
+    </>
+  );
+}
+
+function StorageObjectsSection() {
+  return (
+    <>
+      <H1>Objects</H1>
+      <P>
+        Objects are <InlineCode>:storage.Object</InlineCode> nodes uniquely
+        identified by <InlineCode>(bucket_id, path)</InlineCode>. The{" "}
+        <InlineCode>path</InlineCode> is a flat string but the conventional{" "}
+        <InlineCode>/</InlineCode>-separator lets clients render a folder
+        tree on top.
+      </P>
+
+      <H2>Upload</H2>
+      <P>
+        Two surfaces: <InlineCode>POST</InlineCode> creates (409 on
+        conflict), <InlineCode>PUT</InlineCode> upserts. Body is the raw
+        bytes; <InlineCode>Content-Type</InlineCode> sets the stored MIME.
+      </P>
+      <Code>{`# Single-shot create
+curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: image/png" \\
+  --data-binary @alice.png \\
+  http://localhost:7474/storage/v1/object/avatars/alice.png
+
+# Upsert (replaces if it exists)
+curl -X PUT ...same headers... \\
+  http://localhost:7474/storage/v1/object/avatars/alice.png`}</Code>
+      <P>
+        For files larger than the configured{" "}
+        <InlineCode>upload_chunk_size</InlineCode> (default 5 MiB) use the
+        TUS resumable endpoint — see the Resumable Uploads page.
+      </P>
+
+      <H2>Download</H2>
+      <P>
+        Authenticated downloads via{" "}
+        <InlineCode>GET /storage/v1/object/{`{bucket}/{path}`}</InlineCode>;
+        public buckets also expose{" "}
+        <InlineCode>GET /storage/v1/object/public/{`{bucket}/{path}`}</InlineCode>.
+        Both honour <InlineCode>Range</InlineCode> headers so video and
+        audio players can seek.
+      </P>
+
+      <H2>HEAD</H2>
+      <P>
+        <InlineCode>HEAD /storage/v1/object/{`{bucket}/{path}`}</InlineCode>{" "}
+        returns the metadata headers (<InlineCode>Content-Length</InlineCode>,{" "}
+        <InlineCode>Content-Type</InlineCode>,{" "}
+        <InlineCode>ETag</InlineCode>, <InlineCode>X-Content-SHA256</InlineCode>){" "}
+        without streaming the body — ideal for existence checks.
+      </P>
+
+      <H2>Copy / move</H2>
+      <Code>{`# Copy across buckets
+curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "source_bucket": "avatars",
+    "source_path": "alice.png",
+    "dest_bucket": "thumbnails",
+    "dest_path": "alice.png"
+  }' \\
+  http://localhost:7474/storage/v1/object/copy
+
+# Rename within a bucket
+curl -X POST .../storage/v1/object/move -d '{
+  "source_bucket": "avatars", "source_path": "old.png",
+  "dest_bucket": "avatars",  "dest_path": "new.png"
+}'`}</Code>
+
+      <H2>List</H2>
+      <P>
+        <InlineCode>POST /storage/v1/object/list/{`{bucket}`}</InlineCode>{" "}
+        with an optional prefix, limit, offset, and sort. Defaults to{" "}
+        <InlineCode>limit: 100</InlineCode>, capped at 1000.
+      </P>
+      <Code>{`curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"prefix":"users/","limit":50,"sort_by":"created_at","order":"desc"}' \\
+  http://localhost:7474/storage/v1/object/list/avatars`}</Code>
+
+      <H2>Delete</H2>
+      <P>
+        <InlineCode>DELETE /storage/v1/object/{`{bucket}/{path}`}</InlineCode>.
+        The backend blob is released automatically when the last{" "}
+        <InlineCode>:storage.Object</InlineCode> referencing its content
+        hash is removed (refcount cleanup).
+      </P>
+    </>
+  );
+}
+
+function StorageCypherSection() {
+  return (
+    <>
+      <H1>Cypher Integration</H1>
+      <P>
+        Storage participates in the same Cypher dialect used for the rest
+        of the graph — buckets are nodes, objects are nodes, and dedicated
+        helper functions surface URLs, sizes, and image metadata so reports
+        can pull everything in a single query.
+      </P>
+
+      <H2>Bucket DDL</H2>
+      <Code>{`-- Create
+CREATE BUCKET avatars
+  PUBLIC = true,
+  FILE_SIZE_LIMIT = 5242880,
+  ALLOWED_MIME_TYPES = ["image/png", "image/jpeg"];
+
+-- Update
+ALTER BUCKET avatars SET PUBLIC = false;
+
+-- Drop (bucket must be empty)
+DROP BUCKET avatars;
+
+-- Inspect
+SHOW BUCKETS;`}</Code>
+
+      <H2>Matching objects</H2>
+      <Code>{`-- Every avatar over 1 MB.
+MATCH (o:\`storage.Object\`)
+WHERE o.bucket_id = "avatars" AND o.size > 1048576
+RETURN o.path, file_size(o), file_mime(o)
+ORDER BY o.size DESC
+LIMIT 20;`}</Code>
+
+      <H2>Helper functions</H2>
+      <Table
+        headers={["Function", "Returns", "Use"]}
+        rows={[
+          ["file_url(o)", "string", "Authenticated download URL"],
+          ["signed_url(o, ttl_secs)", "string", "Mint a signed URL inline"],
+          ["file_size(o)", "int", "Byte size"],
+          ["file_mime(o)", "string", "MIME type"],
+          ["file_etag(o)", "string", "Strong ETag"],
+          ["file_hash(o)", "string", "SHA-256 content hash"],
+          ["file_exists(bucket, path)", "bool", "Cheap existence check"],
+          ["bucket_size(bucket)", "int", "Sum of object sizes in a bucket"],
+          ["image_metadata(o)", "map", "{width, height, format, color_space}"],
+        ]}
+      />
+
+      <H2>Attaching objects to user-defined nodes</H2>
+      <P>
+        A common pattern: store the object as a node, then connect it with
+        a typed relationship to a domain object (User, Document, Product…).
+        RLS, sync, and triggers all see this just like any other edge.
+      </P>
+      <Code>{`MATCH (u:User {id: $userId})
+MATCH (o:\`storage.Object\` {bucket_id: "avatars", path: $path})
+CREATE (u)-[:AVATAR]->(o);
+
+-- Later: fetch every user's avatar URL in one round-trip.
+MATCH (u:User)-[:AVATAR]->(o:\`storage.Object\`)
+RETURN u.name, file_url(o) AS avatar_url;`}</Code>
+    </>
+  );
+}
+
+function StorageRLSSection() {
+  return (
+    <>
+      <H1>Storage RLS</H1>
+      <P>
+        Storage objects participate in the same row-level security engine
+        as the rest of the graph. Policies attach to the{" "}
+        <InlineCode>storage.Object</InlineCode> label (or the{" "}
+        <InlineCode>storage.objects</InlineCode> collection) using the
+        familiar <InlineCode>CREATE POLICY</InlineCode> syntax.
+      </P>
+
+      <H2>Standard claims</H2>
+      <P>
+        Every storage RLS predicate has these session variables in scope:
+      </P>
+      <Table
+        headers={["Variable", "Source"]}
+        rows={[
+          ["auth.uid()", "JWT sub claim — current user ID"],
+          ["auth.role()", "JWT role claim"],
+          ["auth.jwt()", "Full JWT payload as a map"],
+          ["row", "The :storage.Object being checked"],
+        ]}
+      />
+
+      <H2>Examples</H2>
+      <Code>{`-- Only the owner can read their objects.
+CREATE POLICY avatars_owner_select
+  ON LABEL \`storage.Object\`
+  FOR SELECT
+  USING (row.owner = auth.uid());
+
+-- Only the owner can upload to their folder.
+CREATE POLICY avatars_owner_insert
+  ON LABEL \`storage.Object\`
+  FOR INSERT
+  WITH CHECK (
+    row.owner = auth.uid()
+    AND row.path STARTS WITH (auth.uid() || '/')
+  );
+
+-- Anyone authenticated can read; only admins can write.
+CREATE POLICY storage_admin_write
+  ON LABEL \`storage.Object\`
+  FOR INSERT, UPDATE, DELETE
+  WITH CHECK ('admin' IN auth.role());`}</Code>
+
+      <H2>Bypass for service_role</H2>
+      <P>
+        Edge functions and server-side code typically authenticate with the{" "}
+        <InlineCode>service_role</InlineCode> claim, which bypasses all
+        storage RLS (just like Postgres / Supabase). End-user requests
+        always go through the policy gauntlet.
+      </P>
+
+      <H2>Public bucket vs RLS</H2>
+      <P>
+        The public-download endpoint (
+        <InlineCode>/storage/v1/object/public/...</InlineCode>) is a
+        deliberate side-channel: it bypasses RLS because the bucket's{" "}
+        <InlineCode>public: true</InlineCode> flag is the authorization.
+        Authenticated downloads through{" "}
+        <InlineCode>/storage/v1/object/{`{bucket}/{path}`}</InlineCode>{" "}
+        always consult RLS.
+      </P>
+    </>
+  );
+}
+
+function StorageSignedSection() {
+  return (
+    <>
+      <H1>Signed URLs</H1>
+      <P>
+        A signed URL is a self-contained, time-boxed share link. The token
+        embeds the bucket, path, scope (read or write), expiry, and the
+        bucket's <InlineCode>signing_version</InlineCode>, all sealed with
+        an HMAC-SHA256 over the server's signing key.
+      </P>
+
+      <H2>Anatomy</H2>
+      <Code>{`http://host:7474/storage/v1/object/signed/<token>
+
+token = base64url(payload) "." base64url(hmac_sha256(key, payload))
+
+payload = {
+  "bucket": "avatars",
+  "path": "alice.png",
+  "exp": 1778838131,           // Unix seconds
+  "iat": 1778834531,
+  "scope": "read" | "write",
+  "bucket_version": 0,
+  "transform": { ... }          // optional, render endpoints only
+}`}</Code>
+
+      <H2>Mint a token</H2>
+      <Code>{`# REST — needs an authenticated session that can SELECT the object.
+curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"expires_in": 3600}' \\
+  http://localhost:7474/storage/v1/object/sign/avatars/alice.png
+
+# CLI
+anvil storage sign avatars/alice.png --ttl 1h
+
+# Cypher
+RETURN signed_url(o, 3600) AS url`}</Code>
+
+      <H2>Server-side clamping</H2>
+      <Table
+        headers={["Field", "Behaviour"]}
+        rows={[
+          ["expires_in = 0", "Use signed_url_default_ttl from config"],
+          ["expires_in > max", "Clamped to signed_url_max_ttl"],
+          ["expires_in <= 0", "Rejected (400)"],
+        ]}
+      />
+
+      <H2>Revocation</H2>
+      <P>
+        The token embeds the bucket's current{" "}
+        <InlineCode>signing_version</InlineCode>. Bump it to invalidate
+        every outstanding token for that bucket:
+      </P>
+      <Code>{`# REST
+curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  http://localhost:7474/storage/v1/bucket/avatars/sign-revoke
+
+# Hammer UI: Storage → bucket → Settings → "Revoke signed URLs"`}</Code>
+      <P>
+        Existing valid signatures still fail the version check after a
+        revoke. The mint endpoint always uses the latest version, so newly
+        minted URLs after the bump work normally.
+      </P>
+
+      <H2>Upload signing</H2>
+      <P>
+        Browser-side uploads to private buckets typically use a
+        write-scoped signed URL so the browser doesn't need to hold a
+        bearer token. <InlineCode>POST /storage/v1/object/upload/sign/...</InlineCode>{" "}
+        returns a <InlineCode>PUT</InlineCode>-able URL.
+      </P>
+    </>
+  );
+}
+
+function StorageTransformsSection() {
+  return (
+    <>
+      <H1>Image Transformations</H1>
+      <P>
+        Anvil ships an in-process image pipeline so common transforms
+        (resize, format conversion, quality re-encode) don't need an
+        external service. The pipeline runs on cache miss and writes the
+        result to a content-addressed cache so repeated requests are zero
+        copies.
+      </P>
+
+      <H2>Two endpoints</H2>
+      <Table
+        headers={["Route", "Auth"]}
+        rows={[
+          ["/storage/v1/render/image/public/{bucket}/{path}", "None (bucket must be public)"],
+          ["/storage/v1/render/image/authenticated/{bucket}/{path}", "Session-bound, honours RLS"],
+          ["/storage/v1/render/image/sign/{bucket}/{path}", "Mint a signed render URL (transform baked into token)"],
+        ]}
+      />
+
+      <H2>Parameters</H2>
+      <Table
+        headers={["Param", "Type", "Notes"]}
+        rows={[
+          ["width", "u32", "Target width in pixels"],
+          ["height", "u32", "Target height in pixels"],
+          ["resize", "cover | contain | fill", "Fit policy"],
+          ["format", "webp | jpeg | png | avif", "Output encoder"],
+          ["quality", "u32 1..100", "Encoder quality"],
+        ]}
+      />
+
+      <H2>Examples</H2>
+      <Code>{`# 200x200 webp thumbnail
+http://host/storage/v1/render/image/public/avatars/alice.png?width=200&height=200&resize=cover&format=webp
+
+# Signed render URL with transform sealed into the token.
+curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "expires_in": 3600,
+    "transform": {"width": 200, "height": 200, "format": "webp"}
+  }' \\
+  http://localhost:7474/storage/v1/render/image/sign/avatars/alice.png`}</Code>
+
+      <H2>Cache</H2>
+      <P>
+        Variants are cached on disk under{" "}
+        <InlineCode>{`{cache_dir}/{source_hash}/{params_hash}`}</InlineCode>.{" "}
+        Configure cache size and limits in{" "}
+        <InlineCode>[file_storage.image_transforms]</InlineCode>:
+      </P>
+      <Code>{`[file_storage.image_transforms]
+cache_dir = "./data/image_cache"
+max_cache_size = "2GiB"
+image_max_dimension = 4096
+allowed_formats = ["webp", "jpeg", "png", "avif"]`}</Code>
+
+      <H2>Limits</H2>
+      <P>
+        Requests for dimensions over <InlineCode>image_max_dimension</InlineCode>{" "}
+        return 400 — protects the renderer from accidental memory blow-ups.
+        Disallowed output formats also 400.
+      </P>
+    </>
+  );
+}
+
+function StorageResumableSection() {
+  return (
+    <>
+      <H1>Resumable Uploads (TUS 1.0.0)</H1>
+      <P>
+        Anvil implements the{" "}
+        <a
+          className="text-blue-400 underline"
+          href="https://tus.io/protocols/resumable-upload"
+          target="_blank"
+          rel="noreferrer"
+        >
+          TUS 1.0.0
+        </a>{" "}
+        resumable upload protocol so large files survive transient failures
+        without restarting. The threshold for switching from single-shot
+        upload to TUS is whatever the client decides — both Hammer and the
+        SDKs default to <InlineCode>5 MiB</InlineCode>.
+      </P>
+
+      <H2>Protocol overview</H2>
+      <Table
+        headers={["Step", "Endpoint", "Headers"]}
+        rows={[
+          ["Initiate", "POST /storage/v1/upload/resumable", "Tus-Resumable, Upload-Length, Upload-Metadata"],
+          ["Append chunk", "PATCH /storage/v1/upload/resumable/{id}", "Upload-Offset, Content-Type=application/offset+octet-stream"],
+          ["Query offset", "HEAD /storage/v1/upload/resumable/{id}", "Tus-Resumable"],
+          ["Abort", "DELETE /storage/v1/upload/resumable/{id}", "Tus-Resumable"],
+          ["Discovery", "OPTIONS /storage/v1/upload/resumable", "Returns Tus-Version, Tus-Extension, Tus-Max-Size"],
+        ]}
+      />
+
+      <H2>Extensions advertised</H2>
+      <Table
+        headers={["Extension", "Behaviour"]}
+        rows={[
+          ["creation", "POST initiates a session"],
+          ["expiration", "Upload-Expires header; expired sessions return 410"],
+          ["checksum", "Upload-Checksum: sha256 <base64> per chunk"],
+          ["termination", "DELETE removes the session + temp file"],
+        ]}
+      />
+
+      <H2>Walk-through</H2>
+      <Code>{`# 1. Create session — Upload-Metadata carries bucket/path/mime as base64.
+curl -i -X POST http://localhost:7474/storage/v1/upload/resumable \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Tus-Resumable: 1.0.0" \\
+  -H "Upload-Length: 10485760" \\
+  -H "Upload-Metadata: bucket dmlkZW9z,path Y2xpcC5tcDQ=,mime dmlkZW8vbXA0"
+
+# 201 Created
+# Location: /storage/v1/upload/resumable/<session-id>
+
+# 2. Append a chunk (any size up to MAX_CHUNK_BYTES = 1 GiB).
+curl -i -X PATCH http://localhost:7474/storage/v1/upload/resumable/<session-id> \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Tus-Resumable: 1.0.0" \\
+  -H "Content-Type: application/offset+octet-stream" \\
+  -H "Upload-Offset: 0" \\
+  --data-binary @part0.bin
+
+# 204 No Content
+# Upload-Offset: <new offset>
+# When offset == Upload-Length, also:
+#   Location: /storage/v1/object/<bucket>/<path>
+#   X-Anvil-Content-Hash: <sha256>`}</Code>
+
+      <H2>Resume after failure</H2>
+      <P>
+        If a chunk fails, issue <InlineCode>HEAD</InlineCode> on the session
+        URL to discover the server's current{" "}
+        <InlineCode>Upload-Offset</InlineCode>, then resume{" "}
+        <InlineCode>PATCH</InlineCode>ing from there. The Anvil client SDKs
+        and the Hammer upload zone do this transparently.
+      </P>
+
+      <H2>Garbage collection</H2>
+      <P>
+        Expired upload sessions are cleaned up by the same background loop
+        that handles snapshot checkpoints. The expiry window comes from{" "}
+        <InlineCode>file_storage.upload_expiry</InlineCode>.
+      </P>
+    </>
+  );
+}
+
+function StorageBackendsSection() {
+  return (
+    <>
+      <H1>Storage Backends</H1>
+      <P>
+        Backend objects are content-addressed by SHA-256 — the storage
+        engine doesn't care where the bytes physically live, only that the
+        backend can <InlineCode>put</InlineCode>,{" "}
+        <InlineCode>get</InlineCode>, <InlineCode>delete</InlineCode>, and{" "}
+        <InlineCode>exists</InlineCode> by hash. Switch backends by
+        changing one line in <InlineCode>anvil.toml</InlineCode>.
+      </P>
+
+      <H2>Available backends</H2>
+      <Table
+        headers={["Backend", "Use", "Status"]}
+        rows={[
+          ["local", "Files under data/storage/{hash[0:2]}/{hash[2:4]}/{hash}", "Production"],
+          ["s3", "AWS S3 (or any S3-compatible: R2, MinIO, Wasabi, B2)", "Stub — Phase 25.4 deferred"],
+          ["gcs", "Google Cloud Storage", "Stub"],
+          ["azure", "Azure Blob Storage", "Stub"],
+        ]}
+      />
+
+      <H2>Local backend</H2>
+      <Code>{`[file_storage]
+backend = "local"
+file_storage_local_root = "./data/storage"
+staging_dir = "./data/staging"        # temp uploads go here first`}</Code>
+      <P>
+        Files are content-addressed: identical bytes are stored once and
+        shared via the in-memory refcounter. The backend never deletes a
+        file while its refcount &gt; 0.
+      </P>
+
+      <H2>S3-compatible (when enabled)</H2>
+      <Code>{`[file_storage]
+backend = "s3"
+
+# Credentials and endpoint pulled from environment:
+# ANVIL_S3_KEY=<access-key>
+# ANVIL_S3_SECRET=<secret>
+# ANVIL_S3_REGION=us-east-1
+# ANVIL_S3_BUCKET=my-anvil-bucket
+# ANVIL_S3_ENDPOINT=https://<r2-account-id>.r2.cloudflarestorage.com  # R2 / MinIO`}</Code>
+
+      <H2>Migration path</H2>
+      <P>
+        Switching from <InlineCode>local</InlineCode> to{" "}
+        <InlineCode>s3</InlineCode> later is a streaming migration: walk{" "}
+        <InlineCode>storage.objects</InlineCode>, read each blob from the
+        local backend, write it to S3 by the same hash, then flip the
+        config. Because the database holds the canonical metadata, the
+        path-level URLs stay identical for every client.
+      </P>
+    </>
+  );
+}
+
+function StorageTriggersSection() {
+  return (
+    <>
+      <H1>Triggers & Edge Functions</H1>
+      <P>
+        Storage objects fire the standard trigger lifecycle — every CRUD
+        event has a <InlineCode>BEFORE</InlineCode> and{" "}
+        <InlineCode>AFTER</InlineCode> hook on both the{" "}
+        <InlineCode>storage.Object</InlineCode> label and the{" "}
+        <InlineCode>storage.objects</InlineCode> collection. This lets you
+        post-process uploads (thumbnail, virus-scan, OCR), enforce custom
+        invariants, or kick off downstream workflows.
+      </P>
+
+      <H2>Available events</H2>
+      <Table
+        headers={["When", "Insert", "Update", "Delete"]}
+        rows={[
+          ["BEFORE", "Validate / mutate before write", "Same for replace", "Veto deletes"],
+          ["AFTER", "Side effects (thumbnail, queue job)", "React to overwrites", "Cleanup external state"],
+        ]}
+      />
+
+      <H2>Example: auto-thumbnail</H2>
+      <Code>{`-- Drop a 200x200 thumbnail into a sibling bucket on every avatar upload.
+CREATE TRIGGER avatar_thumbnail
+  AFTER INSERT ON LABEL \`storage.Object\`
+  WHEN row.bucket_id = "avatars" AND row.mime_type STARTS WITH "image/"
+  EXECUTE EDGE FUNCTION generate_thumbnail
+    WITH ARGS {
+      source_bucket: "avatars",
+      source_path: row.path,
+      dest_bucket: "thumbnails",
+      width: 200,
+      height: 200
+    };`}</Code>
+
+      <H2>Edge function recipe (TypeScript)</H2>
+      <Code>{`// edge_functions/generate_thumbnail.ts
+import { AnvilClient } from "anvilent";
+
+export async function handler(args: {
+  source_bucket: string;
+  source_path: string;
+  dest_bucket: string;
+  width: number;
+  height: number;
+}) {
+  // service_role JWT is injected by the runtime — bypasses RLS.
+  const client = anvil.client;
+
+  // Re-encode via the built-in render endpoint.
+  const url = client.storage
+    .from(args.source_bucket)
+    .getPublicUrl(args.source_path, {
+      transform: { width: args.width, height: args.height, format: "webp" },
+    }).publicUrl;
+
+  const blob = await fetch(url).then((r) => r.blob());
+
+  await client.storage
+    .from(args.dest_bucket)
+    .upload(args.source_path.replace(/\\.[^.]+$/, ".webp"), blob, {
+      contentType: "image/webp",
+      upsert: true,
+    });
+}`}</Code>
+
+      <H2>Other patterns</H2>
+      <Table
+        headers={["Trigger", "Edge function"]}
+        rows={[
+          ["AFTER INSERT", "Push notification (mobile app)"],
+          ["BEFORE INSERT", "Reject upload if virus scanner returns positive"],
+          ["AFTER UPDATE", "Invalidate CDN cache for the public URL"],
+          ["AFTER DELETE", "Mirror deletion to an external archive"],
+        ]}
+      />
+    </>
+  );
+}
+
+function StorageTutorialsSection() {
+  return (
+    <>
+      <H1>Tutorials</H1>
+      <P>
+        Four end-to-end recipes covering the most common storage scenarios.
+        Each one stands alone; the snippets are written against{" "}
+        <InlineCode>anvilent</InlineCode> for TypeScript but every driver
+        carries the same surface.
+      </P>
+
+      <H2>1. User avatar uploads (React + anvilent)</H2>
+      <Code>{`import { AnvilClient } from "anvilent";
+
+const client = await AnvilClient.connect("anvil://localhost:7474/app");
+
+export function AvatarUpload({ userId }: { userId: string }) {
+  async function handleFile(file: File) {
+    await client.storage
+      .from("avatars")
+      .upload(\`\${userId}.png\`, file, {
+        contentType: file.type,
+        upsert: true,
+      });
+  }
+  return (
+    <input
+      type="file"
+      accept="image/*"
+      onChange={(e) => e.target.files && handleFile(e.target.files[0]!)}
+    />
+  );
+}
+
+// And to render — uses the bucket's public URL with a server-side resize.
+function Avatar({ userId }: { userId: string }) {
+  const { publicUrl } = client.storage
+    .from("avatars")
+    .getPublicUrl(\`\${userId}.png\`, {
+      transform: { width: 64, height: 64, resize: "cover", format: "webp" },
+    });
+  return <img src={publicUrl} width={64} height={64} />;
+}`}</Code>
+
+      <H2>2. Image gallery with transforms + signed URLs</H2>
+      <P>
+        Keep the gallery's bucket <em>private</em> so only authenticated
+        users can browse; serve thumbnails via the render endpoint, mint a
+        short-lived signed URL on demand for full-resolution downloads.
+      </P>
+      <Code>{`// List the user's photos.
+const { items } = await client.storage
+  .from("photos")
+  .list(\`\${userId}/\`, { sortBy: { column: "created_at", order: "desc" } });
+
+// Build a thumbnail URL per photo. The render endpoint is server-side
+// auth-checked — RLS still applies.
+const thumbs = items.map((it) => ({
+  path: it.path,
+  url: client.storage.from("photos").getPublicUrl(it.path, {
+    transform: { width: 320, format: "webp" },
+  }).publicUrl,
+}));
+
+// On click, mint a 5-minute signed URL for the original.
+async function downloadOriginal(path: string) {
+  const { signedUrl } = await client.storage
+    .from("photos")
+    .createSignedUrl(path, 300, { transform: undefined });
+  window.location.href = signedUrl;
+}`}</Code>
+
+      <H2>3. Secure document sharing (auth + RLS + signed URLs)</H2>
+      <P>
+        Tenants upload contracts; only members of the deal team can see
+        them; external counterparties get a one-off signed link with a
+        24-hour expiry that revokes the moment the deal closes.
+      </P>
+      <Code>{`-- Schema: every Contract has an owning Deal, every Deal has team members.
+CREATE POLICY contract_team_read
+  ON LABEL \`storage.Object\`
+  FOR SELECT
+  USING (
+    EXISTS {
+      MATCH (o:\`storage.Object\` {bucket_id: "contracts"})
+            -[:CONTRACT_FOR]->(d:Deal)<-[:MEMBER_OF]-(u:User)
+      WHERE u.id = auth.uid() AND o.path = row.path
+    }
+  );
+
+-- Share with an outside party for 24 hours.
+CALL signed_url("contracts", "deal-2026-05-15.pdf", 86400) YIELD url;
+
+-- Closing the deal revokes every link for that bucket.
+CALL revoke_bucket_signed_urls("contracts");`}</Code>
+
+      <H2>4. Automatic thumbnail generation (trigger + edge function)</H2>
+      <P>
+        See <strong>Triggers & Edge Functions</strong> for the full
+        walkthrough — the short version is{" "}
+        <InlineCode>AFTER INSERT</InlineCode> on{" "}
+        <InlineCode>:storage.Object</InlineCode> →{" "}
+        <InlineCode>EXECUTE EDGE FUNCTION</InlineCode> → re-upload via the
+        client SDK using the render endpoint to do the heavy lifting.
+      </P>
     </>
   );
 }

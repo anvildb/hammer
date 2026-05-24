@@ -6,6 +6,20 @@ interface CollectionEntry {
   name: string;
 }
 
+/**
+ * True when `name` belongs to `schema`. The server treats `public.foo` and
+ * bare `foo` as the same logical collection (see the bare-name uniqueness
+ * check in `doc_handlers::create_collection`), so the public schema view
+ * includes both — `public.foo` is the canonical form, `foo` is a legacy
+ * shorthand that still resolves correctly.
+ */
+function collectionInSchema(name: string, schema: string): boolean {
+  const dot = name.indexOf(".");
+  const prefix = dot >= 0 ? name.slice(0, dot) : "";
+  if (schema === "public") return prefix === "" || prefix === "public";
+  return prefix === schema;
+}
+
 export default function DocumentsRoute() {
   const { client, status, selectedSchema, isAdmin, userRoles } = useConnection();
   const canWrite = isAdmin || userRoles.includes("editor");
@@ -19,21 +33,20 @@ export default function DocumentsRoute() {
     if (status !== "connected") return;
     let cancelled = false;
     setCollectionsLoading(true);
+    setCollectionError(null);
     client
       .listCollections()
       .then((colls) => {
         if (!cancelled) {
-          const filtered = colls.filter((c) => {
-            if (selectedSchema === "auth") return c.name.startsWith("auth.");
-            if (selectedSchema === "system") return c.name.startsWith("system.");
-            return !c.name.includes(".");
-          });
+          const filtered = colls.filter((c) => collectionInSchema(c.name, selectedSchema));
           setCollections(
             filtered.map((c) => ({ name: c.name })).sort((a, b) => a.name.localeCompare(b.name))
           );
         }
       })
-      .catch(() => {})
+      .catch((e) => {
+        if (!cancelled) setCollectionError(`Failed to load collections: ${String(e)}`);
+      })
       .finally(() => {
         if (!cancelled) setCollectionsLoading(false);
       });
@@ -79,17 +92,18 @@ export default function DocumentsRoute() {
 
   async function refreshCollections() {
     if (status !== "connected") return;
+    setCollectionsLoading(true);
+    setCollectionError(null);
     try {
       const colls = await client.listCollections();
-      const filtered = colls.filter((c) => {
-        if (selectedSchema === "auth") return c.name.startsWith("auth.");
-        return !c.name.includes(".");
-      });
+      const filtered = colls.filter((c) => collectionInSchema(c.name, selectedSchema));
       setCollections(
         filtered.map((c) => ({ name: c.name })).sort((a, b) => a.name.localeCompare(b.name))
       );
-    } catch {
-      // Silently ignore — collections will show as empty.
+    } catch (e) {
+      setCollectionError(`Failed to load collections: ${String(e)}`);
+    } finally {
+      setCollectionsLoading(false);
     }
   }
 
@@ -97,9 +111,11 @@ export default function DocumentsRoute() {
     if (!newCollectionName.trim() || status !== "connected") return;
     setCollectionError(null);
     try {
-      const fullName = selectedSchema === "public"
-        ? newCollectionName.trim()
-        : `${selectedSchema}.${newCollectionName.trim()}`;
+      const trimmed = newCollectionName.trim();
+      // Always prefix with the schema name. The user types `car_makes` →
+      // we send `public.car_makes` (or `auth.users`, etc.) so the server
+      // can route to the right namespace.
+      const fullName = trimmed.includes(".") ? trimmed : `${selectedSchema}.${trimmed}`;
       await client.createCollection(fullName);
       setNewCollectionName("");
       await refreshCollections();
@@ -316,7 +332,17 @@ export default function DocumentsRoute() {
       {/* Left panel: Collections */}
       <div className="w-64 flex-shrink-0 border-r border-zinc-800 flex flex-col">
         <div className="p-3 border-b border-zinc-800">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-2">Collections</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-zinc-300">Collections</h2>
+            <button
+              onClick={refreshCollections}
+              disabled={collectionsLoading}
+              className="text-xs text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+              title="Reload collections from server"
+            >
+              {collectionsLoading ? "Loading..." : "Refresh"}
+            </button>
+          </div>
           {canWrite ? (
             <>
               <div className="flex gap-1.5">
@@ -347,12 +373,12 @@ export default function DocumentsRoute() {
                   Add Existing
                 </button>
               </div>
-              {collectionError && (
-                <p className="mt-1.5 text-xs text-red-400 break-words">{collectionError}</p>
-              )}
             </>
           ) : (
             <p className="text-xs text-zinc-600">Read-only access</p>
+          )}
+          {collectionError && (
+            <p className="mt-1.5 text-xs text-red-400 break-words">{collectionError}</p>
           )}
         </div>
 
@@ -404,19 +430,21 @@ export default function DocumentsRoute() {
           ))}
         </div>
 
-        {/* Sync Rules section — only visible for admin/editor */}
+        {/* Sync Rules section — only visible for admin/editor.
+            Capped to a fraction of the viewport so a long list can't push
+            the collection list above it to zero height. */}
         {canWrite && (
-          <div className="border-t border-zinc-800">
+          <div className="border-t border-zinc-800 flex-shrink-0 max-h-[40vh] flex flex-col">
             <button
               onClick={() => setSyncOpen(!syncOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200"
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 flex-shrink-0"
             >
               <span>Sync Rules ({syncRules.length})</span>
               <span>{syncOpen ? "−" : "+"}</span>
             </button>
 
             {syncOpen && (
-              <div className="px-3 pb-3 space-y-2">
+              <div className="px-3 pb-3 space-y-2 overflow-y-auto">
                 {/* Existing rules */}
                 {syncRules.length === 0 && (
                   <p className="text-[11px] text-zinc-600 italic">No sync rules defined</p>
