@@ -2204,6 +2204,69 @@ POST /auth/change-password -- { old_password, new_password }`}</Code>
         ]}
       />
 
+      <H2>Passwordless Login (OTP)</H2>
+      <P>
+        Email-based login that doesn't require a password. The user requests
+        a 6-digit code sent to their inbox, then exchanges it for a JWT —
+        same token shape as the password-login flow.
+      </P>
+      <Code>{`# 1. Request a code (no auth required)
+curl -X POST http://localhost:7474/auth/otp/request \\
+  -d '{"email":"alice@example.com"}'
+# => { "expires_in_seconds": 300, "message": "If an account ... has been sent." }
+
+# 2. Exchange the code for a JWT
+curl -X POST http://localhost:7474/auth/otp/verify \\
+  -d '{"email":"alice@example.com","code":"482901"}'
+# => { "accessToken": "...", "idToken": "...", "refreshToken": "...", "mustChangePassword": false }`}</Code>
+      <Table
+        headers={["Setting", "Default", "Description"]}
+        rows={[
+          ["auth.email.otp_ttl_secs", "300", "How long a code is valid"],
+          ["auth.email.otp_max_attempts", "3", "Lockout after this many wrong codes for the same OTP"],
+          ["auth.allow_otp_registration", "false", "Auto-create a user when verify is called for an unknown email"],
+        ]}
+      />
+
+      <H3>Auto-Registration</H3>
+      <P>
+        With <InlineCode>auth.allow_otp_registration = true</InlineCode>, an
+        OTP verify for an email that isn't in <InlineCode>auth.users</InlineCode>{" "}
+        auto-creates the account with the <InlineCode>reader</InlineCode> role,{" "}
+        <InlineCode>email_verified: true</InlineCode>, and no password. Disabled
+        by default — accidentally exposing a passwordless onboarding path to
+        anyone with a working SMTP inbox is rarely what you want.
+      </P>
+      <P>
+        When the flag is off, an unknown-email verify returns the same{" "}
+        <InlineCode>401 "Invalid or expired code"</InlineCode> as a wrong
+        code. Identical response shapes prevent the endpoint from being used
+        to enumerate registered addresses.
+      </P>
+
+      <H3>Username Collisions</H3>
+      <P>
+        The username doubles as the document key in{" "}
+        <InlineCode>auth.users</InlineCode>, so it has to be unique. On
+        auto-registration the server tries the email's local part first —
+        e.g. <InlineCode>alice@example.com</InlineCode> →{" "}
+        <InlineCode>alice</InlineCode>. If that's already taken (because a
+        different person at a different domain shares the local part, or
+        someone manually registered the name), the server appends a 6-char
+        hex suffix and retries: <InlineCode>alice-a3f9d2</InlineCode>.
+        Retries are capped at 10 attempts; the suffix space is 24 bits, so
+        any realistic user base won't hit that ceiling.
+      </P>
+      <P>
+        The provisional user doc carries{" "}
+        <InlineCode>username_provisional: true</InlineCode> so a UI can
+        prompt the new user to choose a permanent handle. Both{" "}
+        <InlineCode>auth.users</InlineCode> and{" "}
+        <InlineCode>auth.user_roles</InlineCode> are keyed on the resolved
+        (potentially suffixed) name, so role lookup stays in sync without
+        any extra steps.
+      </P>
+
       <H2>Service Accounts & API Keys</H2>
       <P>
         Long-lived credentials for CI, scripts, and machine clients. A
