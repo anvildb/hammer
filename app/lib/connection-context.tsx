@@ -111,7 +111,10 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
     };
   }, []);
 
-  // When tokens are refreshed, persist to localStorage.
+  // When tokens are refreshed, persist BOTH new values to localStorage and
+  // update the React-visible username/roles from the rotated access token.
+  // (Roles can change if an admin granted or revoked one mid-session, and
+  // the next page navigation would otherwise still gate UI on stale roles.)
   client.onTokenRefresh = (accessToken, refreshToken) => {
     try {
       const raw = localStorage.getItem(TOKENS_KEY);
@@ -122,6 +125,23 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
     } catch {
       // Ignore.
     }
+    const payload = parseJwtPayload(accessToken);
+    if (payload?.username) setCurrentUser(String(payload.username));
+    if (Array.isArray(payload?.roles)) setUserRoles(payload.roles as string[]);
+  };
+
+  // When refresh fails permanently, drop the session and bounce the user
+  // back to the login screen instead of leaving them stuck on a page where
+  // every API call silently 401s.
+  client.onTokenRefreshFailure = () => {
+    try {
+      localStorage.removeItem(TOKENS_KEY);
+    } catch {
+      // Ignore.
+    }
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setUserRoles([]);
   };
 
   const login = useCallback(async (username: string, password: string) => {

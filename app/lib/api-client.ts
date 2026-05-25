@@ -299,6 +299,10 @@ export class ApiClient {
   private refreshing: Promise<boolean> | null = null;
   /** Called when tokens are refreshed so the context can update localStorage. */
   public onTokenRefresh?: (accessToken: string, refreshToken: string) => void;
+  /** Called when refresh fails permanently — the user needs to log in again.
+   *  The connection context clears its React state and routes to the login
+   *  screen so people don't sit on a page with every API call returning 401. */
+  public onTokenRefreshFailure?: () => void;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -549,7 +553,12 @@ export class ApiClient {
     return result;
   }
 
-  /** Refresh access token using a refresh token. */
+  /** Refresh access token using a refresh token.
+   *
+   *  Updates both `this.authToken` and `this.refreshToken` in-place — the
+   *  server rotates the refresh token on every call, so the next refresh
+   *  must use the latest value or it'll eventually be rejected once the
+   *  server starts honoring rotation. */
   async refreshAccessToken(refreshToken: string): Promise<{
     idToken: string;
     refreshToken: string;
@@ -561,22 +570,37 @@ export class ApiClient {
       accessToken: string;
     }>("/auth/refresh", { refresh_token: refreshToken });
     this.authToken = result.accessToken;
+    this.refreshToken = result.refreshToken;
     return result;
   }
 
-  /** Attempt to refresh the access token. Returns true if successful. Deduplicates concurrent refresh calls. */
+  /** Attempt to refresh the access token. Returns true if successful.
+   *
+   *  Deduplicates concurrent refresh calls — a burst of requests that all
+   *  hit a 401 simultaneously share a single refresh attempt rather than
+   *  racing N parallel POSTs to /auth/refresh.
+   *
+   *  On failure (refresh token expired, deleted, or rejected) the in-memory
+   *  tokens are cleared and `onTokenRefreshFailure` fires so the connection
+   *  context can drop localStorage state and route the user back to login
+   *  instead of leaving them "authenticated" with every request 401-ing. */
   private async tryRefresh(): Promise<boolean> {
     if (this.refreshing) return this.refreshing;
+    if (!this.refreshToken) return false;
 
     this.refreshing = (async () => {
       try {
         const result = await this.refreshAccessToken(this.refreshToken!);
-        this.authToken = result.accessToken;
-        if (this.onTokenRefresh) {
-          this.onTokenRefresh(result.accessToken, this.refreshToken!);
-        }
+        // refreshAccessToken already updated this.authToken and this.refreshToken;
+        // hand the new pair to the persistence callback so localStorage stays
+        // in sync (the second arg used to be the stale token — the rotated one
+        // never made it to disk).
+        this.onTokenRefresh?.(result.accessToken, result.refreshToken);
         return true;
       } catch {
+        this.authToken = undefined;
+        this.refreshToken = undefined;
+        this.onTokenRefreshFailure?.();
         return false;
       } finally {
         this.refreshing = null;
@@ -584,6 +608,32 @@ export class ApiClient {
     })();
 
     return this.refreshing;
+  }
+
+  /** Decode a JWT's `exp` claim (Unix seconds) without verifying the signature.
+   *  Returns null if the token is malformed or has no exp. Used by the
+   *  proactive-refresh path; we never trust this for authorization. */
+  private jwtExpirySeconds(token: string): number | null {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return null;
+      const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
+      const decoded = JSON.parse(atob(padded)) as { exp?: number };
+      return typeof decoded.exp === "number" ? decoded.exp : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** True when the current access token will expire within `skewSecs`.
+   *  Used to refresh proactively so a known-expired call doesn't pay the
+   *  visible 401 round-trip every time. */
+  private accessTokenNeedsRefresh(skewSecs = 60): boolean {
+    if (!this.authToken) return false;
+    const exp = this.jwtExpirySeconds(this.authToken);
+    if (exp === null) return false;
+    return exp - Date.now() / 1000 <= skewSecs;
   }
 
   /** Register a new user. */
@@ -917,6 +967,20 @@ export class ApiClient {
       "Content-Type": "application/json",
       Accept: "application/json",
     };
+
+    // Proactive refresh: if the access token is about to expire (or
+    // already has), refresh it before the request goes out. Saves the
+    // visible 401-then-retry round-trip for every cross-expiry call and
+    // is essential when reopening a tab after >access_ttl idle. Skip for
+    // the auth endpoints themselves so we don't recurse.
+    const isAuthEndpoint = path === "/auth/refresh" || path === "/auth/login";
+    if (
+      !isAuthEndpoint &&
+      this.refreshToken &&
+      this.accessTokenNeedsRefresh()
+    ) {
+      await this.tryRefresh();
+    }
 
     if (this.authToken) {
       headers["Authorization"] = `Bearer ${this.authToken}`;
