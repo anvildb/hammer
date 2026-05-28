@@ -3,11 +3,12 @@ import { UserManagement } from "~/components/admin/user-management";
 import { RoleManagement } from "~/components/admin/role-management";
 import { DatabaseManagement } from "~/components/admin/database-management";
 import { ServiceAccountManagement } from "~/components/admin/service-account-management";
+import { IndexAdvisorPanel } from "~/components/admin/index-advisor-panel";
 import type { User, Role, DatabaseInfo } from "~/components/admin/types";
 import { useConnection } from "~/lib/connection-context";
-import type { EventEntry } from "~/lib/api-client";
+import type { EventEntry, IndexSuggestion } from "~/lib/api-client";
 
-type Tab = "users" | "roles" | "service-accounts" | "databases" | "events" | "alerts";
+type Tab = "users" | "roles" | "service-accounts" | "databases" | "events" | "alerts" | "advisor";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "users", label: "Users" },
@@ -16,6 +17,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "databases", label: "Databases" },
   { id: "events", label: "Event Log" },
   { id: "alerts", label: "Alerts" },
+  { id: "advisor", label: "Index Advisor" },
 ];
 
 export default function AdminRoute() {
@@ -37,6 +39,37 @@ export default function AdminRoute() {
   const [alertRows, setAlertRows] = useState<Array<Record<string, unknown>>>([]);
   const [alertLoading, setAlertLoading] = useState(false);
   const [alertHistory, setAlertHistory] = useState<EventEntry[]>([]);
+
+  // Phase 27.5 — Index Advisor state.
+  const [advisorSuggestions, setAdvisorSuggestions] = useState<IndexSuggestion[]>([]);
+  const [advisorShowDismissed, setAdvisorShowDismissed] = useState(false);
+  const [advisorLoading, setAdvisorLoading] = useState(false);
+
+  const fetchAdvisor = useCallback(
+    async (showDismissed: boolean) => {
+      setAdvisorLoading(true);
+      try {
+        const list = await client.listIndexSuggestions(showDismissed);
+        setAdvisorSuggestions(list);
+      } catch {
+        setAdvisorSuggestions([]);
+      } finally {
+        setAdvisorLoading(false);
+      }
+    },
+    [client],
+  );
+
+  // Auto-load advisor suggestions when entering the tab so operators
+  // don't have to hit Refresh first.
+  useEffect(() => {
+    if (status !== "connected" || activeTab !== "advisor") return;
+    fetchAdvisor(advisorShowDismissed);
+    // We deliberately exclude `advisorShowDismissed` from the deps so
+    // toggling it inside the panel doesn't double-fire (the panel's
+    // onToggleDismissed handler already triggers fetchAdvisor).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, activeTab, fetchAdvisor]);
 
   const fetchDatabases = useCallback(async () => {
     try {
@@ -260,6 +293,56 @@ export default function AdminRoute() {
                 setEventEntries(res.events);
               } catch { setEventEntries([]); }
               finally { setEventLoading(false); }
+            }}
+          />
+        )}
+        {activeTab === "advisor" && (
+          <IndexAdvisorPanel
+            suggestions={advisorSuggestions}
+            showDismissed={advisorShowDismissed}
+            loading={advisorLoading}
+            onToggleDismissed={(next) => {
+              setAdvisorShowDismissed(next);
+              fetchAdvisor(next);
+            }}
+            onRefresh={() => fetchAdvisor(advisorShowDismissed)}
+            onAccept={async (s) => {
+              const safe = /^[A-Za-z_][A-Za-z0-9_]*$/;
+              if (!safe.test(s.label) || !safe.test(s.property)) {
+                alert(
+                  `Cannot auto-name an index for ${s.label}.${s.property}: ` +
+                    `non-identifier characters in the label or property. ` +
+                    `Create the index manually via the SHELL.`,
+                );
+                return;
+              }
+              const indexName = `${s.label.toLowerCase()}_${s.property.toLowerCase()}`;
+              const cypher = `CREATE INDEX ${indexName} FOR (n:${s.label}) ON (n.${s.property})`;
+              if (!confirm(`Run:\n\n${cypher}\n\nProceed?`)) return;
+              try {
+                await client.cypher({ query: cypher });
+                // After accepting, the descriptor exists so the
+                // advisor will skip it on the next pass. Refresh.
+                fetchAdvisor(advisorShowDismissed);
+              } catch (e) {
+                alert(`CREATE INDEX failed: ${e}`);
+              }
+            }}
+            onDismiss={async (id) => {
+              try {
+                await client.dismissIndexSuggestion(id);
+                fetchAdvisor(advisorShowDismissed);
+              } catch (e) {
+                alert(`Dismiss failed: ${e}`);
+              }
+            }}
+            onUndismiss={async (id) => {
+              try {
+                await client.undismissIndexSuggestion(id);
+                fetchAdvisor(advisorShowDismissed);
+              } catch (e) {
+                alert(`Undismiss failed: ${e}`);
+              }
             }}
           />
         )}

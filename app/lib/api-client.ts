@@ -74,6 +74,25 @@ export interface EventEntry {
   metadata: Record<string, string>;
 }
 
+/** IndexAdvisor suggestion shape — matches the server's
+ *  `IndexSuggestionResponse` (see crates/server/src/handlers.rs).
+ *  Phase 27.3.8 + 27.4.9 fields. */
+export interface IndexSuggestion {
+  id: string;
+  label: string;
+  property: string;
+  kind: string;
+  est_benefit_ms: number;
+  est_memory_bytes: number | null;
+  observed_count: number;
+  dismissed: boolean;
+  /** Phase 27.4.9 — true when accepting this suggestion would push
+   *  past `indexes.advisor_memory_budget_bytes`. */
+  would_exceed_budget: boolean;
+  sample_queries: string[];
+  created_on: number;
+}
+
 export interface RuntimeSetting {
   key: string;
   value: string;
@@ -391,6 +410,33 @@ export class ApiClient {
   /** List all roles. */
   async listRoles(): Promise<Array<{ name: string; privileges: string[] }>> {
     return this.get("/admin/roles");
+  }
+
+  // -- Index advisor (Phase 27.3.8.4 / 27.4.9) --
+
+  /** List IndexAdvisor suggestions. `dismissed` filter:
+   *  - omitted / false: only active suggestions (default).
+   *  - true: only dismissed suggestions.
+   *  Each entry matches the server's `IndexSuggestionResponse`.
+   */
+  async listIndexSuggestions(
+    dismissed?: boolean,
+  ): Promise<Array<IndexSuggestion>> {
+    const qs = dismissed === undefined ? "" : `?dismissed=${dismissed ? "true" : "false"}`;
+    return this.get(`/admin/index-suggestions${qs}`);
+  }
+
+  /** Dismiss an IndexAdvisor suggestion by its `sugg-<16hex>` id. */
+  async dismissIndexSuggestion(id: string): Promise<void> {
+    await this.delete(`/admin/index-suggestions/${encodeURIComponent(id)}`);
+  }
+
+  /** Re-enable a previously-dismissed suggestion. */
+  async undismissIndexSuggestion(id: string): Promise<void> {
+    await this.post(
+      `/admin/index-suggestions/${encodeURIComponent(id)}/undismiss`,
+      {},
+    );
   }
 
   // -- Service Accounts (admin) --
