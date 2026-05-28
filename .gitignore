@@ -6,4 +6,5 @@
 /.react-router/
 /build/
 
-save.sh
+save.shplaywright-report/
+test-results/
