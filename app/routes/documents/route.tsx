@@ -13,6 +13,18 @@ interface CollectionEntry {
  * includes both — `public.foo` is the canonical form, `foo` is a legacy
  * shorthand that still resolves correctly.
  */
+/**
+ * Strip the leading `<schema>.` qualifier from a collection name. Used when
+ * matching sync rules against a selected collection — the server accepts
+ * either `public.foo` or bare `foo` for the same logical collection, and a
+ * SYNC LABEL rule can have been registered with either form. Comparing the
+ * bare names handles both cases without having to know the schema.
+ */
+function bareCollectionName(name: string): string {
+  const dot = name.indexOf(".");
+  return dot >= 0 ? name.slice(dot + 1) : name;
+}
+
 function collectionInSchema(name: string, schema: string): boolean {
   const dot = name.indexOf(".");
   const prefix = dot >= 0 ? name.slice(0, dot) : "";
@@ -77,14 +89,17 @@ export default function DocumentsRoute() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
-  // Sync rules
+  // Right-pane tab when a collection is selected: data browser or sync rules.
+  const [rightTab, setRightTab] = useState<"data" | "sync">("data");
+
+  // Sync rules — listed and edited under the Sync tab. The target collection
+  // is implicit (it's the currently-selected one), so we don't carry it as
+  // a separate input field.
   const [syncRules, setSyncRules] = useState<Array<Record<string, unknown>>>([]);
   const [syncLabel, setSyncLabel] = useState("");
-  const [syncCollection, setSyncCollection] = useState("");
   const [syncKey, setSyncKey] = useState("");
   const [syncInclude, setSyncInclude] = useState("");
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncOpen, setSyncOpen] = useState(true);
 
   const PAGE_SIZE = 20;
 
@@ -165,16 +180,21 @@ export default function DocumentsRoute() {
   }
 
   async function handleCreateSyncRule() {
-    if (!syncLabel.trim() || !syncCollection.trim() || !syncKey.trim() || status !== "connected") return;
+    if (
+      !selectedCollection ||
+      !syncLabel.trim() ||
+      !syncKey.trim() ||
+      status !== "connected"
+    )
+      return;
     setSyncError(null);
     try {
-      let query = `SYNC LABEL ${syncLabel.trim()} TO COLLECTION ${syncCollection.trim()} KEY ${syncKey.trim()}`;
+      let query = `SYNC LABEL ${syncLabel.trim()} TO COLLECTION ${selectedCollection} KEY ${syncKey.trim()}`;
       if (syncInclude.trim()) {
         query += ` INCLUDE ${syncInclude.trim()}`;
       }
       await client.cypher({ query });
       setSyncLabel("");
-      setSyncCollection("");
       setSyncKey("");
       setSyncInclude("");
       await refreshSyncRules();
@@ -238,6 +258,8 @@ export default function DocumentsRoute() {
     setEditMode("view");
     setDocuments([]);
     setDocCursor(null);
+    setRightTab("data");
+    setSyncError(null);
     loadDocuments(name);
   }
 
@@ -430,108 +452,6 @@ export default function DocumentsRoute() {
           ))}
         </div>
 
-        {/* Sync Rules section — only visible for admin/editor.
-            Capped to a fraction of the viewport so a long list can't push
-            the collection list above it to zero height. */}
-        {canWrite && (
-          <div className="border-t border-zinc-800 flex-shrink-0 max-h-[40vh] flex flex-col">
-            <button
-              onClick={() => setSyncOpen(!syncOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200 flex-shrink-0"
-            >
-              <span>Sync Rules ({syncRules.length})</span>
-              <span>{syncOpen ? "−" : "+"}</span>
-            </button>
-
-            {syncOpen && (
-              <div className="px-3 pb-3 space-y-2 overflow-y-auto">
-                {/* Existing rules */}
-                {syncRules.length === 0 && (
-                  <p className="text-[11px] text-zinc-600 italic">No sync rules defined</p>
-                )}
-                {syncRules.map((rule) => (
-                  <div
-                    key={String(rule.id)}
-                    className="group flex items-start justify-between bg-zinc-900 rounded px-2 py-1.5 text-[11px]"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-zinc-300 font-mono">
-                        :{String(rule.label)} → {String(rule.collection)}
-                      </div>
-                      <div className="text-zinc-500">
-                        key={String(rule.key_property)}{" "}
-                        {rule.include && rule.include !== "*" ? `include=${String(rule.include)}` : "(all props)"}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => {
-                          const include = rule.include && rule.include !== "*" ? ` INCLUDE ${String(rule.include)}` : "";
-                          const query = `SYNC LABEL ${String(rule.label)} TO COLLECTION ${String(rule.collection)} KEY ${String(rule.key_property)}${include}`;
-                          navigator.clipboard.writeText(query);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1 transition-opacity"
-                        title="Copy SYNC LABEL statement"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-                          <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
-                          <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDropSyncRule(rule.id)}
-                        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 px-1 transition-opacity"
-                      >
-                        Drop
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Create new rule form */}
-                <div className="space-y-1 pt-1 border-t border-zinc-800">
-                  <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">New Sync Rule</p>
-                  <input
-                    type="text"
-                    value={syncLabel}
-                    onChange={(e) => setSyncLabel(e.target.value)}
-                    placeholder="Label (e.g. Person)"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    value={syncCollection}
-                    onChange={(e) => setSyncCollection(e.target.value)}
-                    placeholder="Collection (e.g. persons)"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    value={syncKey}
-                    onChange={(e) => setSyncKey(e.target.value)}
-                    placeholder="Key property (e.g. name)"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    value={syncInclude}
-                    onChange={(e) => setSyncInclude(e.target.value)}
-                    placeholder="Include props (e.g. name, email) or blank for all"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-100 focus:outline-none focus:border-blue-500"
-                  />
-                  <button
-                    onClick={handleCreateSyncRule}
-                    disabled={!syncLabel.trim() || !syncCollection.trim() || !syncKey.trim()}
-                    className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
-                  >
-                    Create Sync Rule
-                  </button>
-                  {syncError && <p className="text-red-400 text-[11px]">{syncError}</p>}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Right panel: Document browser + viewer */}
@@ -542,6 +462,46 @@ export default function DocumentsRoute() {
           </div>
         ) : (
           <>
+            {/* Tab strip — Data vs Sync rules, both scoped to the selected
+                collection. The collection name lives in the tab bar so the
+                user always knows which collection the tabs apply to. */}
+            <div className="flex items-center gap-1 px-4 py-1.5 border-b border-zinc-800">
+              <span className="text-xs text-zinc-500 mr-3">
+                <span className="font-mono text-zinc-300">{selectedCollection}</span>
+              </span>
+              <button
+                onClick={() => setRightTab("data")}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  rightTab === "data"
+                    ? "bg-zinc-800 text-zinc-100"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                }`}
+              >
+                Data
+              </button>
+              <button
+                onClick={() => setRightTab("sync")}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  rightTab === "sync"
+                    ? "bg-zinc-800 text-zinc-100"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                }`}
+              >
+                Sync
+                {(() => {
+                  const count = syncRules.filter((r) =>
+                    bareCollectionName(String(r.collection ?? "")) ===
+                    bareCollectionName(selectedCollection),
+                  ).length;
+                  return count > 0 ? (
+                    <span className="ml-1.5 text-[10px] text-zinc-500 tabular-nums">{count}</span>
+                  ) : null;
+                })()}
+              </button>
+            </div>
+
+            {rightTab === "data" && (
+            <>
             {/* Document list header */}
             <div className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800">
               <h2 className="text-sm font-semibold text-zinc-200">
@@ -706,6 +666,136 @@ export default function DocumentsRoute() {
                 )}
               </div>
             </div>
+            </>
+            )}
+
+            {rightTab === "sync" && (
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Filtered rule list. Match on bare collection name so a
+                    rule registered as `public.foo` shows under `foo` and
+                    vice versa, matching how the server resolves names. */}
+                {(() => {
+                  const matching = syncRules.filter((r) =>
+                    bareCollectionName(String(r.collection ?? "")) ===
+                    bareCollectionName(selectedCollection),
+                  );
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                          Sync Rules
+                          <span className="ml-2 text-[11px] text-zinc-600 font-normal">({matching.length})</span>
+                        </h3>
+                        <button
+                          onClick={refreshSyncRules}
+                          className="text-[11px] text-zinc-500 hover:text-zinc-300"
+                          title="Reload sync rules"
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                      {matching.length === 0 ? (
+                        <p className="text-xs text-zinc-600 italic">
+                          No sync rules target this collection.
+                          {canWrite && " Add one below to mirror a graph label into this collection."}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {matching.map((rule) => (
+                            <div
+                              key={String(rule.id)}
+                              className="group flex items-start justify-between bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-zinc-300 font-mono">
+                                  :{String(rule.label)} → {String(rule.collection)}
+                                </div>
+                                <div className="text-zinc-500 mt-0.5">
+                                  key={String(rule.key_property)}
+                                  {" · "}
+                                  {rule.include && rule.include !== "*"
+                                    ? `include=${String(rule.include)}`
+                                    : "all props"}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => {
+                                    const include = rule.include && rule.include !== "*" ? ` INCLUDE ${String(rule.include)}` : "";
+                                    const query = `SYNC LABEL ${String(rule.label)} TO COLLECTION ${String(rule.collection)} KEY ${String(rule.key_property)}${include}`;
+                                    navigator.clipboard.writeText(query);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 px-1 transition-opacity"
+                                  title="Copy SYNC LABEL statement"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                                    <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
+                                    <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
+                                  </svg>
+                                </button>
+                                {canWrite && (
+                                  <button
+                                    onClick={() => handleDropSyncRule(rule.id)}
+                                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 px-1 transition-opacity"
+                                  >
+                                    Drop
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {canWrite && (
+                  <div className="border-t border-zinc-800 pt-4 space-y-2">
+                    <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">
+                      New Sync Rule
+                    </p>
+                    <p className="text-[11px] text-zinc-600">
+                      Targets{" "}
+                      <span className="font-mono text-zinc-400">{selectedCollection}</span>.
+                      Anvil will mirror nodes of the given label into this collection,
+                      keyed on the property you choose.
+                    </p>
+                    <input
+                      type="text"
+                      value={syncLabel}
+                      onChange={(e) => setSyncLabel(e.target.value)}
+                      placeholder="Label (e.g. Person)"
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="text"
+                      value={syncKey}
+                      onChange={(e) => setSyncKey(e.target.value)}
+                      placeholder="Key property (e.g. name)"
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="text"
+                      value={syncInclude}
+                      onChange={(e) => setSyncInclude(e.target.value)}
+                      placeholder="Include props (comma-separated), or blank for all"
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      onClick={handleCreateSyncRule}
+                      disabled={!syncLabel.trim() || !syncKey.trim()}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
+                    >
+                      Create Sync Rule
+                    </button>
+                    {syncError && (
+                      <p className="text-red-400 text-xs break-words">{syncError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
