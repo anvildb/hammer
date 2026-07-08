@@ -171,7 +171,7 @@ export default function HelpRoute() {
   }, [location.hash]);
 
   return (
-    <div className="flex lg:flex-row flex-col h-full bg-zinc-950 text-zinc-100">
+    <div className="flex lg:flex-row flex-col bg-zinc-950 text-zinc-100">
       {/* Sidebar TOC */}
       <nav className="lg:w-56 w-full shrink-0 border-r border-zinc-800 overflow-y-auto">
         {/* Mobile toggle */}
