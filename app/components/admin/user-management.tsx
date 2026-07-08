@@ -5,7 +5,10 @@ interface UserManagementProps {
   users: User[];
   availableRoles: string[];
   onCreateUser: (username: string, password: string, roles: string[]) => void;
-  onEditUser: (username: string, patch: { roles?: string[]; active?: boolean }) => void;
+  onEditUser: (
+    username: string,
+    patch: { roles?: string[]; active?: boolean; email?: string }
+  ) => void;
   onDeleteUser: (username: string) => void;
 }
 
@@ -51,6 +54,9 @@ export function UserManagement({
           <div key={user.username} className="px-3 py-2 hover:bg-zinc-800/20">
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-zinc-200">{user.username}</span>
+              {user.email && (
+                <span className="text-[11px] text-zinc-500 font-mono">{user.email}</span>
+              )}
               {!user.active && (
                 <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-400">
                   disabled
@@ -196,13 +202,29 @@ function EditUserInline({
 }: {
   user: User;
   availableRoles: string[];
-  onSave: (patch: { roles: string[] }) => void;
+  onSave: (patch: { roles: string[]; email: string }) => void;
   onCancel: () => void;
 }) {
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set(user.roles));
+  const [email, setEmail] = useState(user.email ?? "");
+
+  const trimmedEmail = email.trim();
+  const emailInvalid = trimmedEmail.length > 0 && !trimmedEmail.includes("@");
 
   return (
     <div className="mt-2 p-2 rounded bg-zinc-900 border border-zinc-700 space-y-2">
+      <Field label="Email">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="user@example.com"
+          className="w-full bg-zinc-800 text-zinc-300 text-xs rounded px-2 py-1 border border-zinc-700 focus:outline-none focus:border-zinc-500"
+        />
+        {emailInvalid && (
+          <span className="text-[11px] text-red-400">Enter a valid email address.</span>
+        )}
+      </Field>
       <Field label="Roles">
         <div className="flex flex-wrap gap-1">
           {availableRoles.map((role) => (
@@ -229,8 +251,9 @@ function EditUserInline({
       </Field>
       <div className="flex gap-2">
         <button
-          onClick={() => onSave({ roles: [...selectedRoles] })}
-          className="text-[11px] px-2 py-0.5 rounded bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
+          disabled={emailInvalid}
+          onClick={() => onSave({ roles: [...selectedRoles], email: trimmedEmail })}
+          className="text-[11px] px-2 py-0.5 rounded bg-zinc-700 text-zinc-200 hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Save
         </button>

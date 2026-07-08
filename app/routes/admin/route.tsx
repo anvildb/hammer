@@ -129,13 +129,25 @@ export default function AdminRoute() {
 
     fetchDatabases();
 
-    // Fetch users and roles.
-    client
-      .listUsers()
-      .then((serverUsers) => {
+    // Fetch users and roles. Emails live on the `auth.users` documents (not
+    // returned by listUsers), so pull them via a projected scan and merge in.
+    Promise.all([
+      client.listUsers(),
+      client
+        .scanDocuments("auth.users", { projection: "username,email", limit: 10000 })
+        .catch(() => ({ documents: [], count: 0, cursor: null })),
+    ])
+      .then(([serverUsers, emailScan]) => {
+        const emailByUser = new Map<string, string>();
+        for (const doc of emailScan.documents) {
+          const uname = (doc.body?.username as string) ?? doc.key;
+          const em = doc.body?.email;
+          if (typeof em === "string" && em.length > 0) emailByUser.set(uname, em);
+        }
         setUsers(
           serverUsers.map((u) => ({
             username: u.username,
+            email: emailByUser.get(u.username),
             roles: u.roles,
             active: true,
             createdAt: Date.now(),
@@ -229,7 +241,27 @@ export default function AdminRoute() {
                 alert(String(e));
               }
             }}
-            onEditUser={() => {}}
+            onEditUser={async (username, patch) => {
+              // Assign/clear the user's email. auth.users is a full-replace
+              // upsert, so read the current document and merge to preserve the
+              // password hash and other fields. The :User node picks up the
+              // new email automatically via the auth sync rule.
+              if (patch.email === undefined) return;
+              try {
+                const doc = await client.getDocument("auth.users", username);
+                await client.putDocument("auth.users", username, {
+                  ...doc.body,
+                  email: patch.email,
+                });
+                setUsers((prev) =>
+                  prev.map((u) =>
+                    u.username === username ? { ...u, email: patch.email || undefined } : u
+                  )
+                );
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
             onDeleteUser={async (username) => {
               if (!confirm(`Delete user "${username}"? This will also remove the :User node from the graph.`)) return;
               try {
