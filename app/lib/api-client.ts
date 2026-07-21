@@ -570,6 +570,26 @@ export class ApiClient {
     return result.databases;
   }
 
+  /**
+   * Download a complete database export (admin only) — graph data, all
+   * document collections across every schema, users, settings, RLS
+   * policies, functions, triggers, sync rules, and indexes. Returns the
+   * snapshot blob and the server-suggested filename.
+   */
+  async exportDatabase(signal?: AbortSignal): Promise<{ blob: Blob; filename: string }> {
+    const headers: Record<string, string> = {};
+    if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
+    const resp = await fetch(`${this.baseUrl}/db/export`, { headers, signal });
+    if (!resp.ok) {
+      throw new ApiError(resp.status, resp.statusText, await resp.text().catch(() => ""));
+    }
+    const cd = resp.headers.get("content-disposition") ?? "";
+    const match = cd.match(/filename="?([^"]+)"?/);
+    const filename =
+      match?.[1] ?? `anvil-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.anvil`;
+    return { blob: await resp.blob(), filename };
+  }
+
   /** Get database schema. */
   async getSchema(database: string): Promise<unknown> {
     return this.get(`/db/${encodeURIComponent(database)}/schema`);

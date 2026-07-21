@@ -303,6 +303,21 @@ export default function AdminRoute() {
             onDropDatabase={(name) => {
               console.log("Drop db:", name);
             }}
+            onExport={async () => {
+              try {
+                const { blob, filename } = await client.exportDatabase();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
           />
         )}
         {activeTab === "events" && (

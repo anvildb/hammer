@@ -7,6 +7,8 @@ interface DatabaseManagementProps {
   onStartDatabase: (name: string) => void;
   onStopDatabase: (name: string) => void;
   onDropDatabase: (name: string) => void;
+  /** Download a full database export (graph, documents, users, policies, etc.). */
+  onExport: () => void | Promise<void>;
 }
 
 export function DatabaseManagement({
@@ -15,9 +17,20 @@ export function DatabaseManagement({
   onStartDatabase,
   onStopDatabase,
   onDropDatabase,
+  onExport,
 }: DatabaseManagementProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await onExport();
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,12 +49,22 @@ export function DatabaseManagement({
             {databases.length}
           </span>
         </h3>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
-        >
-          {showCreate ? "Cancel" : "+ Create"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            title="Download a full export of the database (graph, documents, users, policies, functions, triggers, settings)"
+            className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exporting ? "Exporting…" : "↓ Export DB"}
+          </button>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+          >
+            {showCreate ? "Cancel" : "+ Create"}
+          </button>
+        </div>
       </div>
 
       {showCreate && (
