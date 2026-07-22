@@ -36,7 +36,7 @@ export function AppShell({ children }: AppShellProps) {
           onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           onLogout={logout}
         />
-        <main className="flex-1 flex overflow-auto [&>*]:flex-1">
+        <main className="flex-1 flex overflow-auto *:flex-1">
           {children}
         </main>
       </div>
