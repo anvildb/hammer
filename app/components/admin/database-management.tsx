@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { DatabaseInfo, DatabaseStatus } from "./types";
 
 interface DatabaseManagementProps {
@@ -9,6 +9,8 @@ interface DatabaseManagementProps {
   onDropDatabase: (name: string) => void;
   /** Download a full database export (graph, documents, users, policies, etc.). */
   onExport: () => void | Promise<void>;
+  /** Restore the whole database from an export file. Destructive. */
+  onImport: (file: File) => void | Promise<void>;
 }
 
 export function DatabaseManagement({
@@ -18,10 +20,13 @@ export function DatabaseManagement({
   onStopDatabase,
   onDropDatabase,
   onExport,
+  onImport,
 }: DatabaseManagementProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = async () => {
     setExporting(true);
@@ -29,6 +34,24 @@ export function DatabaseManagement({
       await onExport();
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    const ok = window.confirm(
+      `Restore from "${file.name}"?\n\nThis REPLACES ALL current data — graph, documents, ` +
+        `users, settings, policies, functions, and triggers — with the contents of the file. ` +
+        `This cannot be undone.`,
+    );
+    if (!ok) return;
+    setImporting(true);
+    try {
+      await onImport(file);
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -50,13 +73,28 @@ export function DatabaseManagement({
           </span>
         </h3>
         <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".anvil,application/octet-stream"
+            onChange={handleFileSelected}
+            className="hidden"
+          />
           <button
             onClick={handleExport}
-            disabled={exporting}
+            disabled={exporting || importing}
             title="Download a full export of the database (graph, documents, users, policies, functions, triggers, settings)"
             className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {exporting ? "Exporting…" : "↓ Export DB"}
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing || exporting}
+            title="Restore the entire database from an export file (replaces all current data)"
+            className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-amber-300 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {importing ? "Restoring…" : "↑ Import DB"}
           </button>
           <button
             onClick={() => setShowCreate(!showCreate)}

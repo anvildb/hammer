@@ -590,6 +590,30 @@ export class ApiClient {
     return { blob: await resp.blob(), filename };
   }
 
+  /**
+   * Restore the entire database from an export file (admin only).
+   * DESTRUCTIVE — replaces all live data with the file's contents.
+   */
+  async importDatabase(
+    file: File | Blob,
+    signal?: AbortSignal,
+  ): Promise<{ message: string; nodes: number; relationships: number; collections: number }> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/octet-stream",
+    };
+    if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
+    const resp = await fetch(`${this.baseUrl}/db/import`, {
+      method: "POST",
+      headers,
+      body: file,
+      signal,
+    });
+    if (!resp.ok) {
+      throw new ApiError(resp.status, resp.statusText, await resp.text().catch(() => ""));
+    }
+    return resp.json();
+  }
+
   /** Get database schema. */
   async getSchema(database: string): Promise<unknown> {
     return this.get(`/db/${encodeURIComponent(database)}/schema`);

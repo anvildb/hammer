@@ -318,6 +318,19 @@ export default function AdminRoute() {
                 setError(String(e));
               }
             }}
+            onImport={async (file) => {
+              try {
+                const result = await client.importDatabase(file);
+                // Everything was replaced — reload so the whole UI reflects
+                // the restored data, users, roles, and settings.
+                alert(
+                  `Database restored: ${result.nodes} nodes, ${result.relationships} relationships, ${result.collections} collections. Reloading…`,
+                );
+                window.location.reload();
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
           />
         )}
         {activeTab === "events" && (
