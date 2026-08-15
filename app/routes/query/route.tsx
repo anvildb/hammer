@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { useConnection } from "~/lib/connection-context";
 import type { CypherResult } from "~/lib/api-client";
 import { GraphViewer } from "~/components/graph/graph-viewer";
@@ -9,7 +10,10 @@ type ResultView = "table" | "json" | "graph" | "plan";
 
 export default function QueryRoute() {
   const { client, status, selectedSchema } = useConnection();
-  const [query, setQuery] = useState("MATCH (n) RETURN n");
+  const [searchParams] = useSearchParams();
+  // `?q=` lets other pages (the home console, links in Help) hand a query off
+  // to the full editor.
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "MATCH (n) RETURN n");
   const [result, setResult] = useState<CypherResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
