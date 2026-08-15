@@ -1,4 +1,4 @@
-// Phase 27.5 — IndexAdvisor admin panel.
+// Phase 27.5 - IndexAdvisor admin panel.
 //
 // Lists the live suggestions emitted by `crates/server/src/index_advisor.rs`
 // (Phase 27.3.8) and exposes one-click CREATE INDEX, dismiss, and undismiss
@@ -100,7 +100,7 @@ export function IndexAdvisorPanel({
                   </td>
                   <td className="px-3 py-1.5 text-xs text-right tabular-nums">
                     {s.est_memory_bytes === null ? (
-                      <span className="text-zinc-600">—</span>
+                      <span className="text-zinc-600">-</span>
                     ) : (
                       <span
                         className={
@@ -175,7 +175,7 @@ export function IndexAdvisorPanel({
             ? "Loading..."
             : showDismissed
               ? "No dismissed suggestions."
-              : "No active suggestions — the advisor hasn't observed unindexed label scans yet, or every probe is already covered by an existing index."}
+              : "No active suggestions - the advisor hasn't observed unindexed label scans yet, or every probe is already covered by an existing index."}
         </p>
       )}
 

@@ -42,8 +42,8 @@ export function DatabaseManagement({
     e.target.value = ""; // allow re-selecting the same file later
     if (!file) return;
     const ok = window.confirm(
-      `Restore from "${file.name}"?\n\nThis REPLACES ALL current data — graph, documents, ` +
-        `users, settings, policies, functions, and triggers — with the contents of the file. ` +
+      `Restore from "${file.name}"?\n\nThis REPLACES ALL current data - graph, documents, ` +
+        `users, settings, policies, functions, and triggers - with the contents of the file. ` +
         `This cannot be undone.`,
     );
     if (!ok) return;

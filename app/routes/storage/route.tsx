@@ -19,11 +19,11 @@ type Tab = "files" | "usage" | "settings";
 const TUS_THRESHOLD = 5 * 1024 * 1024;
 
 /**
- * /storage — top-level file storage UI (Phase 25.15).
+ * /storage - top-level file storage UI (Phase 25.15).
  *
  * Layout:
  *   - Left rail: bucket list with usage chips (BucketList).
- *   - Center: tabbed view — Files / Usage / Settings.
+ *   - Center: tabbed view - Files / Usage / Settings.
  *       · Files tab: breadcrumb-driven folder browser + DnD upload zone.
  *       · Usage tab: aggregate stats + per-bucket bar chart + top files.
  *       · Settings tab: bucket-level public/private toggle, size caps,
@@ -373,7 +373,7 @@ function BucketSettings({
       <div>
         <h2 className="text-lg font-semibold text-zinc-100">Bucket: {bucket.id}</h2>
         <p className="text-xs text-zinc-500 mt-1">
-          Owner: <span className="font-mono">{bucket.owner || "—"}</span> · Created{" "}
+          Owner: <span className="font-mono">{bucket.owner || "-"}</span> · Created{" "}
           {new Date(bucket.created_at).toLocaleString()}
         </p>
       </div>
@@ -390,7 +390,7 @@ function BucketSettings({
             onChange={(e) => setPub(e.target.checked)}
             className="accent-blue-500"
           />
-          Public — anonymous downloads via{" "}
+          Public - anonymous downloads via{" "}
           <code className="font-mono text-xs">/storage/v1/object/public/...</code>
         </label>
         {canWrite && (

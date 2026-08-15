@@ -4,7 +4,7 @@ import { formatBytes } from "~/lib/api-client";
 
 /**
  * "Virtual" folder derived from a path prefix. The server stores objects
- * with flat paths like `users/alice/photo.png` — the UI splits on `/` to
+ * with flat paths like `users/alice/photo.png` - the UI splits on `/` to
  * fabricate a folder tree on top.
  */
 type FolderNode = {
@@ -36,7 +36,7 @@ interface Props {
  * Bucket browser. Computes a virtual folder tree from path prefixes, supports
  * fuzzy filename search, three-column sort (name / size / updated), and
  * row-level checkbox selection for bulk operations. The breadcrumb at the
- * top doubles as a navigation control — clicking a segment scopes the
+ * top doubles as a navigation control - clicking a segment scopes the
  * listing to that folder.
  */
 export function FileBrowser({

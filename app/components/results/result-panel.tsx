@@ -12,7 +12,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
   const [mode, setMode] = useState<ResultViewMode>("table");
 
   // Auto-select best mode when result changes.
-  // (Graph mode is a stub — the full graph view lives in the graph route;
+  // (Graph mode is a stub - the full graph view lives in the graph route;
   //  here we just offer the tab for result sets containing nodes/rels.)
 
   if (!result) {

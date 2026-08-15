@@ -22,7 +22,7 @@ const INTERVALS = [
   { label: "60s", ms: 60000 },
 ];
 
-const DEFAULT_QUERY = "MATCH (n)\nRETURN n LIMIT 25";
+const DEFAULT_QUERY = "MATCH (n)\nRETURN n LIMIT 500";
 
 export default function IndexRoute() {
   const { client, status, serverInfo, currentUser, isAdmin, selectedSchema } = useConnection();
@@ -170,7 +170,7 @@ export default function IndexRoute() {
 
   const isEmptyGraph = stats?.nodes === 0 && (stats?.documents ?? 0) === 0;
   const connected = status === "connected";
-  /** True once we've fallen back to Cypher counts — the rest is admin-gated. */
+  /** True once we've fallen back to Cypher counts - the rest is admin-gated. */
   const restricted = stats !== null && stats.collections === null;
 
   const hint = (normal: string) => (restricted ? "requires admin" : normal);
@@ -183,12 +183,12 @@ export default function IndexRoute() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Anvil DB</h1>
             <p className="mt-1 text-sm text-zinc-400">
-              A graph database{currentUser ? ` — signed in as ${currentUser}` : ""}.
+              A graph database{currentUser ? ` - signed in as ${currentUser}` : ""}.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <Pill label="status" value={status} tone={connected ? "good" : "warn"} />
-              <Pill label="version" value={serverInfo?.version ?? "—"} />
-              <Pill label="edition" value={serverInfo?.edition ?? "—"} />
+              <Pill label="version" value={serverInfo?.version ?? "-"} />
+              <Pill label="edition" value={serverInfo?.edition ?? "-"} />
               <Pill label="uptime" value={formatUptime(serverInfo?.uptime)} />
               <Pill label="schema" value={selectedSchema} />
               <Pill label="api" value={client.baseUrl} mono />
@@ -245,7 +245,7 @@ export default function IndexRoute() {
         {!connected && (
           <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 px-4 py-3 text-sm text-amber-300">
             Not connected to{" "}
-            <span className="font-mono text-amber-200">{client.baseUrl}</span> — retrying every 5s.
+            <span className="font-mono text-amber-200">{client.baseUrl}</span> - retrying every 5s.
             Start the server with <code className="font-mono text-amber-200">anvil start</code>, or
             point Hammer elsewhere in{" "}
             <Link to="/settings" className="underline underline-offset-2 hover:text-amber-100">
@@ -283,7 +283,7 @@ export default function IndexRoute() {
             label="Documents"
             value={stats?.documents ?? null}
             delta={delta("documents")}
-            // No sparkline when the count is unknown — a flat line at zero
+            // No sparkline when the count is unknown - a flat line at zero
             // would read as a real reading.
             series={stats && stats.documents === null ? [] : series.documents}
             to="/documents"
@@ -317,11 +317,7 @@ export default function IndexRoute() {
 
         {/* Working surfaces */}
         <div className="grid gap-4 xl:grid-cols-2 items-start">
-          <QuickConsole
-            query={consoleQuery}
-            onQueryChange={setConsoleQuery}
-            onExecuted={refreshStats}
-          />
+          <QuickConsole query={consoleQuery} onQueryChange={setConsoleQuery} />
           <div className="space-y-4">
             <SchemaGlance
               schema={schema}
@@ -341,7 +337,7 @@ export default function IndexRoute() {
             Press <kbd className="font-mono text-zinc-500">⌘K</kbd> for the command palette
           </span>
           <span>
-            <kbd className="font-mono text-zinc-500">⌘↵</kbd> runs the query above
+            <kbd className="font-mono text-zinc-500">⌘↵</kbd> runs the query above in the editor
           </span>
           <Link to="/help" className="hover:text-zinc-400 transition-colors">
             Documentation →
@@ -380,7 +376,7 @@ function Pill({
   );
 }
 
-/** Shown while the database is still empty — three concrete next steps. */
+/** Shown while the database is still empty - three concrete next steps. */
 function GettingStarted({ onPickQuery }: { onPickQuery: (query: string) => void }) {
   return (
     <section className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">

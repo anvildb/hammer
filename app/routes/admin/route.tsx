@@ -40,7 +40,7 @@ export default function AdminRoute() {
   const [alertLoading, setAlertLoading] = useState(false);
   const [alertHistory, setAlertHistory] = useState<EventEntry[]>([]);
 
-  // Phase 27.5 — Index Advisor state.
+  // Phase 27.5 - Index Advisor state.
   const [advisorSuggestions, setAdvisorSuggestions] = useState<IndexSuggestion[]>([]);
   const [advisorShowDismissed, setAdvisorShowDismissed] = useState(false);
   const [advisorLoading, setAdvisorLoading] = useState(false);
@@ -321,7 +321,7 @@ export default function AdminRoute() {
             onImport={async (file) => {
               try {
                 const result = await client.importDatabase(file);
-                // Everything was replaced — reload so the whole UI reflects
+                // Everything was replaced - reload so the whole UI reflects
                 // the restored data, users, roles, and settings.
                 alert(
                   `Database restored: ${result.nodes} nodes, ${result.relationships} relationships, ${result.collections} collections. Reloading…`,

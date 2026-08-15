@@ -34,7 +34,7 @@ test.describe("App Shell", () => {
     await page.keyboard.press("Meta+k");
     // Command palette should appear.
     await expect(page.locator('[placeholder*="command"], [placeholder*="search"], [role="dialog"]')).toBeVisible({ timeout: 2000 }).catch(() => {
-      // May not be visible in all layouts — just verify no crash.
+      // May not be visible in all layouts - just verify no crash.
     });
   });
 });

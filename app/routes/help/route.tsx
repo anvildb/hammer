@@ -463,7 +463,7 @@ open http://localhost:5175
 
       <H2>Import Sample Data</H2>
       <P>
-        Import the built-in sample dataset (8 people, 3 companies, 3 projects, 5 skills —
+        Import the built-in sample dataset (8 people, 3 companies, 3 projects, 5 skills -
         19 nodes, 51 relationships) to get started quickly.
       </P>
       <Code>{`anvil import --sample`}</Code>
@@ -530,7 +530,7 @@ RETURN p.name, friend.name, r.since`}</Code>
       <P>
         Beyond standard Cypher, Anvil adds first-class support for documents, stored functions,
         triggers, row-level security policies, sync rules, and query analysis. These extensions
-        integrate seamlessly — you can reference documents in graph queries, trigger document
+        integrate seamlessly - you can reference documents in graph queries, trigger document
         writes from graph events, and synchronize data between both models.
       </P>
       <Table
@@ -603,7 +603,7 @@ RETURN p.name, project.name`}</Code>
 
       <H2>WITH</H2>
       <P>
-        Chains query stages. Acts as a projection barrier — only variables listed in{" "}
+        Chains query stages. Acts as a projection barrier - only variables listed in{" "}
         <InlineCode>WITH</InlineCode> are visible downstream.
       </P>
       <Code>{`MATCH (p:Person)-[:FRIEND]->(f)
@@ -795,7 +795,7 @@ function CypherAggregationSection() {
       <H1>Aggregation & Grouping</H1>
       <P>
         Non-aggregated expressions in <InlineCode>RETURN</InlineCode> or{" "}
-        <InlineCode>WITH</InlineCode> act as implicit grouping keys — no{" "}
+        <InlineCode>WITH</InlineCode> act as implicit grouping keys - no{" "}
         <InlineCode>GROUP BY</InlineCode> clause is needed.
       </P>
 
@@ -1212,7 +1212,7 @@ function CypherTriggersSection() {
     <>
       <H1>Triggers</H1>
       <P>
-        Event-driven logic that fires automatically on INSERT, UPDATE, or DELETE — on graph
+        Event-driven logic that fires automatically on INSERT, UPDATE, or DELETE - on graph
         labels or document collections. Triggers execute within the same transaction as the
         triggering operation, guaranteeing atomicity.
       </P>
@@ -1338,7 +1338,7 @@ ENABLE ROW LEVEL SECURITY ON COLLECTION profiles`}</Code>
       <H2>CREATE POLICY</H2>
       <P>
         Syntax: <InlineCode>CREATE POLICY name ON target FOR op [TO role] USING (predicate)</InlineCode>.
-        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all users.
+        The <InlineCode>TO role</InlineCode> clause is optional - omitting it applies the policy to all users.
       </P>
       <Code>{`-- Users see only their own data
 CREATE POLICY own_data ON :Project FOR SELECT TO reader
@@ -1399,7 +1399,7 @@ SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
       <P>
         RLS policies are enforced on writes as well as reads. SET operations check the
         USING predicate per-node before applying changes. UPSERT DOCUMENT checks the
-        USING predicate per-document. Write policies bypass the RBAC role check — any
+        USING predicate per-document. Write policies bypass the RBAC role check - any
         user whose data satisfies the predicate can write, regardless of role.
       </P>
 
@@ -1965,7 +1965,7 @@ function TriggersSection() {
     <>
       <H1>Triggers</H1>
       <P>
-        Event-driven logic that fires automatically on INSERT, UPDATE, or DELETE — on graph labels
+        Event-driven logic that fires automatically on INSERT, UPDATE, or DELETE - on graph labels
         or document collections. Triggers execute within the same transaction as the triggering operation.
       </P>
 
@@ -2069,7 +2069,7 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
         document into the graph <em>before</em> any AFTER INSERT / UPDATE /
         DELETE trigger fires. Trigger bodies can therefore <InlineCode>MATCH</InlineCode>{" "}
         the synced node and rely on it being present (or absent, for deletes)
-        — there's no race against the sync pass.
+        - there's no race against the sync pass.
       </P>
 
       <H2>Chaining, Backfill & Depth</H2>
@@ -2085,7 +2085,7 @@ SHOW TRIGGERS ON COLLECTION auth.users`}</Code>
         Priority ordering (lower = first, default 100). Recursive trigger firing is capped
         at 16 levels deep to prevent infinite loops.
         Use <InlineCode>SKIP TRIGGERS</InlineCode> on sync rules to prevent cascades.
-        <InlineCode>UPSERT DOCUMENT</InlineCode> only updates specified fields — existing fields are preserved.
+        <InlineCode>UPSERT DOCUMENT</InlineCode> only updates specified fields - existing fields are preserved.
       </P>
     </>
   );
@@ -2107,7 +2107,7 @@ function RLSSection() {
       <H2>Create Policies</H2>
       <P>
         Syntax: <InlineCode>CREATE POLICY name ON target FOR op [TO role] USING (predicate)</InlineCode>.
-        The <InlineCode>TO role</InlineCode> clause is optional — omitting it applies the policy to all users.
+        The <InlineCode>TO role</InlineCode> clause is optional - omitting it applies the policy to all users.
       </P>
       <Code>{`-- Users see only their own data
 CREATE POLICY own_data ON :Project FOR SELECT TO reader
@@ -2139,7 +2139,7 @@ CREATE POLICY no_secret ON :Document FOR SELECT TO reader
       <P>
         SET operations check the USING predicate per-node before applying changes.
         UPSERT DOCUMENT checks the USING predicate per-document. Write policies bypass
-        the RBAC role check — any user whose data satisfies the predicate can write.
+        the RBAC role check - any user whose data satisfies the predicate can write.
       </P>
 
       <H2>Behavior</H2>
@@ -2207,7 +2207,7 @@ POST /auth/change-password -- { old_password, new_password }`}</Code>
       <H2>Passwordless Login (OTP)</H2>
       <P>
         Email-based login that doesn't require a password. The user requests
-        a 6-digit code sent to their inbox, then exchanges it for a JWT —
+        a 6-digit code sent to their inbox, then exchanges it for a JWT -
         same token shape as the password-login flow.
       </P>
       <Code>{`# 1. Request a code (no auth required)
@@ -2234,7 +2234,7 @@ curl -X POST http://localhost:7474/auth/otp/verify \\
         OTP verify for an email that isn't in <InlineCode>auth.users</InlineCode>{" "}
         auto-creates the account with the <InlineCode>reader</InlineCode> role,{" "}
         <InlineCode>email_verified: true</InlineCode>, and no password. Disabled
-        by default — accidentally exposing a passwordless onboarding path to
+        by default - accidentally exposing a passwordless onboarding path to
         anyone with a working SMTP inbox is rarely what you want.
       </P>
       <P>
@@ -2248,7 +2248,7 @@ curl -X POST http://localhost:7474/auth/otp/verify \\
       <P>
         The username doubles as the document key in{" "}
         <InlineCode>auth.users</InlineCode>, so it has to be unique. On
-        auto-registration the server tries the email's local part first —
+        auto-registration the server tries the email's local part first -
         e.g. <InlineCode>alice@example.com</InlineCode> →{" "}
         <InlineCode>alice</InlineCode>. If that's already taken (because a
         different person at a different domain shares the local part, or
@@ -2279,7 +2279,7 @@ curl -X POST http://localhost:7474/auth/service-accounts \\
   -H "Authorization: Bearer $ADMIN_JWT" \\
   -d '{"name": "ci-bot", "roles": ["editor"]}'
 
-# Mint a key — the plaintext is returned ONCE, only stored as a hash after
+# Mint a key - the plaintext is returned ONCE, only stored as a hash after
 curl -X POST http://localhost:7474/auth/service-accounts/$ID/keys \\
   -H "Authorization: Bearer $ADMIN_JWT" \\
   -d '{"name": "github-actions"}'
@@ -2292,7 +2292,7 @@ curl http://localhost:7474/db/query \\
       <Table
         headers={["Capability", "Detail"]}
         rows={[
-          ["Key prefix", "anvil_sk_ — the auth middleware uses this to distinguish keys from JWTs"],
+          ["Key prefix", "anvil_sk_ - the auth middleware uses this to distinguish keys from JWTs"],
           ["Storage", "auth.service_accounts and auth.api_keys collections (admin-only writes)"],
           ["Scopes", "Per-key allowlist; intersected with the account's roles at request time"],
           ["service_role", "Capability flag that bypasses RLS when both the account and key scope allow it"],
@@ -2321,9 +2321,9 @@ smtp_starttls = true             # only consulted when port != 465`}</Code>
       <Table
         headers={["Port", "Mode", "When to use"]}
         rows={[
-          ["465", "Implicit TLS", "Resend, Mailgun TLS endpoints — handshake happens before SMTP"],
-          ["587", "STARTTLS upgrade", "Gmail, Office 365, most relays — plaintext greeting then upgrade"],
-          ["25 / other", "Plaintext", "Dev-only — set smtp_starttls=false to opt in"],
+          ["465", "Implicit TLS", "Resend, Mailgun TLS endpoints - handshake happens before SMTP"],
+          ["587", "STARTTLS upgrade", "Gmail, Office 365, most relays - plaintext greeting then upgrade"],
+          ["25 / other", "Plaintext", "Dev-only - set smtp_starttls=false to opt in"],
         ]}
       />
       <P>
@@ -2519,7 +2519,7 @@ function ConfigSection() {
       <Code>{`# Read all settings
 curl http://localhost:7474/system/settings -H "Authorization: Bearer $JWT"
 
-# Update one (admin only) — takes effect immediately
+# Update one (admin only) - takes effect immediately
 curl -X PUT http://localhost:7474/system/settings/auth.email.smtp_host \\
   -H "Authorization: Bearer $ADMIN_JWT" \\
   -d '{"value": "smtp.resend.com"}'
@@ -2708,7 +2708,7 @@ function HammerSection() {
 
       <H2>Graph Visualization</H2>
       <P>
-        Force-directed layout with D3.js. Click a node to enter focus mode — direct
+        Force-directed layout with D3.js. Click a node to enter focus mode - direct
         connections orbit in an evenly-spaced circle with yellow highlighted edges and labels,
         while non-neighbors are pushed to the periphery with hidden labels. Double-click to
         expand neighbors. Shift+drag for lasso selection. Right-click for edit/delete context
@@ -2861,7 +2861,7 @@ result, err := client.Query("MATCH (n) RETURN n LIMIT 10")`}</Code>
 function StorageOverviewSection() {
   return (
     <>
-      <H1>File Storage — Overview</H1>
+      <H1>File Storage - Overview</H1>
       <P>
         Anvil bundles an object/blob store directly inside the database
         binary, so deployments don't need a sidecar S3/MinIO instance. Files
@@ -2891,7 +2891,7 @@ function StorageOverviewSection() {
       />
       <P>
         Backend blobs are content-addressed (SHA-256). Two objects with
-        identical bytes share one backend file — uploading the same image
+        identical bytes share one backend file - uploading the same image
         twice is free after the first time.
       </P>
 
@@ -2929,9 +2929,9 @@ function StorageOverviewSection() {
 function StorageQuickstartSection() {
   return (
     <>
-      <H1>File Storage — Quickstart</H1>
+      <H1>File Storage - Quickstart</H1>
       <P>
-        Create a bucket, upload a file, and download it — start to finish
+        Create a bucket, upload a file, and download it - start to finish
         in under five minutes. The examples below assume a running server
         at <InlineCode>localhost:7474</InlineCode> with default config.
       </P>
@@ -2995,7 +2995,7 @@ function StorageBucketsSection() {
         A bucket is a logical container for objects. Each bucket carries a
         public/private flag, optional per-file size cap, optional total
         bucket size cap, an allow-list of MIME types, and an owner. Buckets
-        are <InlineCode>:storage.Bucket</InlineCode> nodes — visible to
+        are <InlineCode>:storage.Bucket</InlineCode> nodes - visible to
         Cypher, GraphQL, and RLS like any other graph entity.
       </P>
 
@@ -3085,7 +3085,7 @@ curl -X PUT ...same headers... \\
       <P>
         For files larger than the configured{" "}
         <InlineCode>upload_chunk_size</InlineCode> (default 5 MiB) use the
-        TUS resumable endpoint — see the Resumable Uploads page.
+        TUS resumable endpoint - see the Resumable Uploads page.
       </P>
 
       <H2>Download</H2>
@@ -3104,7 +3104,7 @@ curl -X PUT ...same headers... \\
         returns the metadata headers (<InlineCode>Content-Length</InlineCode>,{" "}
         <InlineCode>Content-Type</InlineCode>,{" "}
         <InlineCode>ETag</InlineCode>, <InlineCode>X-Content-SHA256</InlineCode>){" "}
-        without streaming the body — ideal for existence checks.
+        without streaming the body - ideal for existence checks.
       </P>
 
       <H2>Copy / move</H2>
@@ -3153,7 +3153,7 @@ function StorageCypherSection() {
       <H1>Cypher Integration</H1>
       <P>
         Storage participates in the same Cypher dialect used for the rest
-        of the graph — buckets are nodes, objects are nodes, and dedicated
+        of the graph - buckets are nodes, objects are nodes, and dedicated
         helper functions surface URLs, sizes, and image metadata so reports
         can pull everything in a single query.
       </P>
@@ -3234,7 +3234,7 @@ function StorageRLSSection() {
       <Table
         headers={["Variable", "Source"]}
         rows={[
-          ["auth.uid()", "JWT sub claim — current user ID"],
+          ["auth.uid()", "JWT sub claim - current user ID"],
           ["auth.role()", "JWT role claim"],
           ["auth.jwt()", "Full JWT payload as a map"],
           ["row", "The :storage.Object being checked"],
@@ -3312,7 +3312,7 @@ payload = {
 }`}</Code>
 
       <H2>Mint a token</H2>
-      <Code>{`# REST — needs an authenticated session that can SELECT the object.
+      <Code>{`# REST - needs an authenticated session that can SELECT the object.
 curl -X POST -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"expires_in": 3600}' \\
@@ -3425,7 +3425,7 @@ allowed_formats = ["webp", "jpeg", "png", "avif"]`}</Code>
       <H2>Limits</H2>
       <P>
         Requests for dimensions over <InlineCode>image_max_dimension</InlineCode>{" "}
-        return 400 — protects the renderer from accidental memory blow-ups.
+        return 400 - protects the renderer from accidental memory blow-ups.
         Disallowed output formats also 400.
       </P>
     </>
@@ -3448,7 +3448,7 @@ function StorageResumableSection() {
         </a>{" "}
         resumable upload protocol so large files survive transient failures
         without restarting. The threshold for switching from single-shot
-        upload to TUS is whatever the client decides — both Hammer and the
+        upload to TUS is whatever the client decides - both Hammer and the
         SDKs default to <InlineCode>5 MiB</InlineCode>.
       </P>
 
@@ -3476,7 +3476,7 @@ function StorageResumableSection() {
       />
 
       <H2>Walk-through</H2>
-      <Code>{`# 1. Create session — Upload-Metadata carries bucket/path/mime as base64.
+      <Code>{`# 1. Create session - Upload-Metadata carries bucket/path/mime as base64.
 curl -i -X POST http://localhost:7474/storage/v1/upload/resumable \\
   -H "Authorization: Bearer $TOKEN" \\
   -H "Tus-Resumable: 1.0.0" \\
@@ -3524,7 +3524,7 @@ function StorageBackendsSection() {
     <>
       <H1>Storage Backends</H1>
       <P>
-        Backend objects are content-addressed by SHA-256 — the storage
+        Backend objects are content-addressed by SHA-256 - the storage
         engine doesn't care where the bytes physically live, only that the
         backend can <InlineCode>put</InlineCode>,{" "}
         <InlineCode>get</InlineCode>, <InlineCode>delete</InlineCode>, and{" "}
@@ -3537,7 +3537,7 @@ function StorageBackendsSection() {
         headers={["Backend", "Use", "Status"]}
         rows={[
           ["local", "Files under data/storage/{hash[0:2]}/{hash[2:4]}/{hash}", "Production"],
-          ["s3", "AWS S3 (or any S3-compatible: R2, MinIO, Wasabi, B2)", "Stub — Phase 25.4 deferred"],
+          ["s3", "AWS S3 (or any S3-compatible: R2, MinIO, Wasabi, B2)", "Stub - Phase 25.4 deferred"],
           ["gcs", "Google Cloud Storage", "Stub"],
           ["azure", "Azure Blob Storage", "Stub"],
         ]}
@@ -3583,7 +3583,7 @@ function StorageTriggersSection() {
     <>
       <H1>Triggers & Edge Functions</H1>
       <P>
-        Storage objects fire the standard trigger lifecycle — every CRUD
+        Storage objects fire the standard trigger lifecycle - every CRUD
         event has a <InlineCode>BEFORE</InlineCode> and{" "}
         <InlineCode>AFTER</InlineCode> hook on both the{" "}
         <InlineCode>storage.Object</InlineCode> label and the{" "}
@@ -3626,7 +3626,7 @@ export async function handler(args: {
   width: number;
   height: number;
 }) {
-  // service_role JWT is injected by the runtime — bypasses RLS.
+  // service_role JWT is injected by the runtime - bypasses RLS.
   const client = anvil.client;
 
   // Re-encode via the built-in render endpoint.
@@ -3694,7 +3694,7 @@ export function AvatarUpload({ userId }: { userId: string }) {
   );
 }
 
-// And to render — uses the bucket's public URL with a server-side resize.
+// And to render - uses the bucket's public URL with a server-side resize.
 function Avatar({ userId }: { userId: string }) {
   const { publicUrl } = client.storage
     .from("avatars")
@@ -3716,7 +3716,7 @@ const { items } = await client.storage
   .list(\`\${userId}/\`, { sortBy: { column: "created_at", order: "desc" } });
 
 // Build a thumbnail URL per photo. The render endpoint is server-side
-// auth-checked — RLS still applies.
+// auth-checked - RLS still applies.
 const thumbs = items.map((it) => ({
   path: it.path,
   url: client.storage.from("photos").getPublicUrl(it.path, {
@@ -3759,7 +3759,7 @@ CALL revoke_bucket_signed_urls("contracts");`}</Code>
       <H2>4. Automatic thumbnail generation (trigger + edge function)</H2>
       <P>
         See <strong>Triggers & Edge Functions</strong> for the full
-        walkthrough — the short version is{" "}
+        walkthrough - the short version is{" "}
         <InlineCode>AFTER INSERT</InlineCode> on{" "}
         <InlineCode>:storage.Object</InlineCode> →{" "}
         <InlineCode>EXECUTE EDGE FUNCTION</InlineCode> → re-upload via the

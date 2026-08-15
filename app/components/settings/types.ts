@@ -29,7 +29,7 @@ export interface ConnectionProfile {
   host: string;
   port: number;
   username: string;
-  /** Not stored — only kept in-session when the user enters it. */
+  /** Not stored - only kept in-session when the user enters it. */
   password?: string;
   useTls: boolean;
 }

@@ -74,7 +74,7 @@ export interface EventEntry {
   metadata: Record<string, string>;
 }
 
-/** IndexAdvisor suggestion shape — matches the server's
+/** IndexAdvisor suggestion shape - matches the server's
  *  `IndexSuggestionResponse` (see crates/server/src/handlers.rs).
  *  Phase 27.3.8 + 27.4.9 fields. */
 export interface IndexSuggestion {
@@ -86,7 +86,7 @@ export interface IndexSuggestion {
   est_memory_bytes: number | null;
   observed_count: number;
   dismissed: boolean;
-  /** Phase 27.4.9 — true when accepting this suggestion would push
+  /** Phase 27.4.9 - true when accepting this suggestion would push
    *  past `indexes.advisor_memory_budget_bytes`. */
   would_exceed_budget: boolean;
   sample_queries: string[];
@@ -305,7 +305,7 @@ export interface ApiKey {
 }
 
 /** Returned only at creation time; the `secret` field is the plaintext key
- *  and is never returned again — show it to the user once and discard. */
+ *  and is never returned again - show it to the user once and discard. */
 export interface CreatedApiKey extends ApiKey {
   secret: string;
 }
@@ -318,7 +318,7 @@ export class ApiClient {
   private refreshing: Promise<boolean> | null = null;
   /** Called when tokens are refreshed so the context can update localStorage. */
   public onTokenRefresh?: (accessToken: string, refreshToken: string) => void;
-  /** Called when refresh fails permanently — the user needs to log in again.
+  /** Called when refresh fails permanently - the user needs to log in again.
    *  The connection context clears its React state and routes to the login
    *  screen so people don't sit on a page with every API call returning 401. */
   public onTokenRefreshFailure?: () => void;
@@ -474,7 +474,7 @@ export class ApiClient {
   }
 
   /** Mint a new API key. The returned `secret` is the only time the plaintext
-   *  is exposed — surface it to the user once and forget it. */
+   *  is exposed - surface it to the user once and forget it. */
   async createApiKey(
     accountId: string,
     req: { name: string; scopes?: string[]; expires_on?: number | null },
@@ -571,7 +571,7 @@ export class ApiClient {
   }
 
   /**
-   * Download a complete database export (admin only) — graph data, all
+   * Download a complete database export (admin only) - graph data, all
    * document collections across every schema, users, settings, RLS
    * policies, functions, triggers, sync rules, and indexes. Returns the
    * snapshot blob and the server-suggested filename.
@@ -592,7 +592,7 @@ export class ApiClient {
 
   /**
    * Restore the entire database from an export file (admin only).
-   * DESTRUCTIVE — replaces all live data with the file's contents.
+   * DESTRUCTIVE - replaces all live data with the file's contents.
    */
   async importDatabase(
     file: File | Blob,
@@ -645,7 +645,7 @@ export class ApiClient {
 
   /** Refresh access token using a refresh token.
    *
-   *  Updates both `this.authToken` and `this.refreshToken` in-place — the
+   *  Updates both `this.authToken` and `this.refreshToken` in-place - the
    *  server rotates the refresh token on every call, so the next refresh
    *  must use the latest value or it'll eventually be rejected once the
    *  server starts honoring rotation. */
@@ -666,7 +666,7 @@ export class ApiClient {
 
   /** Attempt to refresh the access token. Returns true if successful.
    *
-   *  Deduplicates concurrent refresh calls — a burst of requests that all
+   *  Deduplicates concurrent refresh calls - a burst of requests that all
    *  hit a 401 simultaneously share a single refresh attempt rather than
    *  racing N parallel POSTs to /auth/refresh.
    *
@@ -683,7 +683,7 @@ export class ApiClient {
         const result = await this.refreshAccessToken(this.refreshToken!);
         // refreshAccessToken already updated this.authToken and this.refreshToken;
         // hand the new pair to the persistence callback so localStorage stays
-        // in sync (the second arg used to be the stale token — the rotated one
+        // in sync (the second arg used to be the stale token - the rotated one
         // never made it to disk).
         this.onTokenRefresh?.(result.accessToken, result.refreshToken);
         return true;
@@ -1224,7 +1224,7 @@ export function guessMime(path: string): string | undefined {
 
 /** Format a byte count as a human-readable size. */
 export function formatBytes(n: number | undefined | null): string {
-  if (n === undefined || n === null) return "—";
+  if (n === undefined || n === null) return "-";
   if (n < 1024) return `${n} B`;
   const units = ["KiB", "MiB", "GiB", "TiB"];
   let val = n / 1024;

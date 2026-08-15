@@ -31,10 +31,14 @@ export function Sidebar({ favorites }: SidebarProps) {
 
   return (
     <aside className="flex flex-col w-56 h-full bg-zinc-900 border-r border-zinc-800">
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
-        <img src="anvil.webp" className="" />
-      </div>
+      {/* Logo - doubles as the way home */}
+      <Link
+        to="/"
+        aria-label="Anvil home"
+        className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors"
+      >
+        <img src="anvil.webp" alt="Anvil" />
+      </Link>
 
       {/* Schema selector */}
       <div className="px-3 py-2 border-b border-zinc-800">

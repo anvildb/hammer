@@ -1,6 +1,6 @@
 # Hammer
 
-Web-based management UI for [Anvil DB](https://anvildb.com). Query your graph, visualize relationships, manage documents, configure security, and administer users — all from the browser.
+Web-based management UI for [Anvil DB](https://anvildb.com). Query your graph, visualize relationships, manage documents, configure security, and administer users - all from the browser.
 
 ## Pages
 
@@ -24,14 +24,14 @@ Web-based management UI for [Anvil DB](https://anvildb.com). Query your graph, v
 
 The graph visualization uses D3.js force simulation with multiple layout options:
 
-- **Force-directed** — default physics-based layout
-- **Hierarchical** — layered by in-degree
-- **Circular** — nodes arranged in a circle
-- **Grid** — evenly spaced grid
+- **Force-directed** - default physics-based layout
+- **Hierarchical** - layered by in-degree
+- **Circular** - nodes arranged in a circle
+- **Grid** - evenly spaced grid
 
-**Focus mode** — click a node to pin it and orbit its direct connections in an evenly-spaced circle. Connected edges and labels highlight in yellow. Non-neighbor labels are hidden and nodes outside the orbit are pushed to the periphery. Click empty space to deselect and restore the normal layout.
+**Focus mode** - click a node to pin it and orbit its direct connections in an evenly-spaced circle. Connected edges and labels highlight in yellow. Non-neighbor labels are hidden and nodes outside the orbit are pushed to the periphery. Click empty space to deselect and restore the normal layout.
 
-**Interactions** — drag to move nodes, shift+drag for lasso selection, double-click to expand neighbors, right-click for context menus (inspect, edit, expand, hide, delete), scroll to zoom, minimap for navigation.
+**Interactions** - drag to move nodes, shift+drag for lasso selection, double-click to expand neighbors, right-click for context menus (inspect, edit, expand, hide, delete), scroll to zoom, minimap for navigation.
 
 ## Security
 
@@ -61,7 +61,7 @@ Runs at `http://localhost:5175` with hot module replacement.
 npm run build
 ```
 
-Output in `build/` — deploy the `client/` and `server/` directories to any Node.js host or container.
+Output in `build/` - deploy the `client/` and `server/` directories to any Node.js host or container.
 
 ## Tech Stack
 

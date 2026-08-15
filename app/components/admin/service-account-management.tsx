@@ -620,7 +620,7 @@ function CreateKeyForm({
         <div className="flex flex-wrap gap-1">
           {accountRoles.length === 0 && (
             <span className="text-[11px] text-zinc-600 italic">
-              account has no roles — key will inherit none
+              account has no roles - key will inherit none
             </span>
           )}
           {accountRoles.map((r) => {
@@ -676,7 +676,7 @@ function CreateKeyForm({
 }
 
 // ---------------------------------------------------------------------------
-// One-time secret display — the server returns the plaintext key only once
+// One-time secret display - the server returns the plaintext key only once
 // at creation, so the user MUST copy it now or never get it back.
 // ---------------------------------------------------------------------------
 
@@ -693,7 +693,7 @@ function NewKeyDisplay({
     <div className="mb-3 p-3 rounded border border-amber-700 bg-amber-950/30 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold text-amber-300">
-          Save this key now — it won't be shown again.
+          Save this key now - it won't be shown again.
         </span>
       </div>
       <div className="flex gap-2 items-center">

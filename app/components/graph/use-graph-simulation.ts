@@ -81,7 +81,7 @@ export function useGraphSimulation({
 
     if (!focusNodeId) {
       prevFocusRef.current = null;
-      // Restore defaults — remove focus forces.
+      // Restore defaults - remove focus forces.
       sim.force("focusRadial", null);
       const linkForce = sim.force("link") as ReturnType<typeof forceLink> | undefined;
       linkForce?.distance(300).strength(0.5);

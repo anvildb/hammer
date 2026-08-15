@@ -10,12 +10,12 @@ interface CollectionEntry {
  * True when `name` belongs to `schema`. The server treats `public.foo` and
  * bare `foo` as the same logical collection (see the bare-name uniqueness
  * check in `doc_handlers::create_collection`), so the public schema view
- * includes both — `public.foo` is the canonical form, `foo` is a legacy
+ * includes both - `public.foo` is the canonical form, `foo` is a legacy
  * shorthand that still resolves correctly.
  */
 /**
  * Strip the leading `<schema>.` qualifier from a collection name. Used when
- * matching sync rules against a selected collection — the server accepts
+ * matching sync rules against a selected collection - the server accepts
  * either `public.foo` or bare `foo` for the same logical collection, and a
  * SYNC LABEL rule can have been registered with either form. Comparing the
  * bare names handles both cases without having to know the schema.
@@ -92,7 +92,7 @@ export default function DocumentsRoute() {
   // Right-pane tab when a collection is selected: data browser or sync rules.
   const [rightTab, setRightTab] = useState<"data" | "sync">("data");
 
-  // Sync rules — listed and edited under the Sync tab. The target collection
+  // Sync rules - listed and edited under the Sync tab. The target collection
   // is implicit (it's the currently-selected one), so we don't carry it as
   // a separate input field.
   const [syncRules, setSyncRules] = useState<Array<Record<string, unknown>>>([]);
@@ -462,7 +462,7 @@ export default function DocumentsRoute() {
           </div>
         ) : (
           <>
-            {/* Tab strip — Data vs Sync rules, both scoped to the selected
+            {/* Tab strip - Data vs Sync rules, both scoped to the selected
                 collection. The collection name lives in the tab bar so the
                 user always knows which collection the tabs apply to. */}
             <div className="flex items-center gap-1 px-4 py-1.5 border-b border-zinc-800">

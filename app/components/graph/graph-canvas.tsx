@@ -225,7 +225,7 @@ export function GraphCanvas({
     [config.edgeStyle.thicknessProperty],
   );
 
-  // Node caption helper — checks per-label override first, then global.
+  // Node caption helper - checks per-label override first, then global.
   const nodeCaption = useCallback(
     (node: GraphNode) => {
       // Check per-label caption property.
@@ -273,7 +273,7 @@ export function GraphCanvas({
   const handleNodeMouseDown = (e: ReactMouseEvent, node: GraphNode) => {
     if (e.button !== 0) return;
     e.stopPropagation();
-    // Start tracking a potential drag. We don't select yet — wait for mouseUp
+    // Start tracking a potential drag. We don't select yet - wait for mouseUp
     // without drag to select (so dragging doesn't toggle selection).
     dragRef.current = { node, startedDrag: false };
     node.fx = node.x;
@@ -304,7 +304,7 @@ export function GraphCanvas({
       const { node, startedDrag } = dragRef.current;
       dragRef.current = null;
       if (!startedDrag) {
-        // Was a click, not a drag — select/inspect the node.
+        // Was a click, not a drag - select/inspect the node.
         onSelectNode(node.id, e.shiftKey);
         onInspectNode(node);
       }
@@ -440,7 +440,7 @@ export function GraphCanvas({
               const idx = pairSeen.get(pairKey) ?? 0;
               pairSeen.set(pairKey, idx + 1);
 
-              // Perpendicular unit vector — always computed from the normalized
+              // Perpendicular unit vector - always computed from the normalized
               // pair direction (lower ID → higher ID) so parallel edges curve
               // consistently regardless of which node is source vs target.
               const normFlip = src.id < tgt.id ? 1 : -1;

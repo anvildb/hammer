@@ -1,4 +1,4 @@
-// Phase 27.7 — Hammer e2e for the IndexAdvisor admin tab.
+// Phase 27.7 - Hammer e2e for the IndexAdvisor admin tab.
 //
 // Verifies the new /admin Index Advisor tab renders, fetches
 // suggestions, and surfaces the per-suggestion actions. Uses
@@ -122,7 +122,7 @@ test.describe("Index Advisor admin tab", () => {
       page.getByRole("heading", { name: /Index Advisor/ }),
     ).toBeVisible();
 
-    // Row 1 — Person.email, no budget warning. Cells are <td>; the
+    // Row 1 - Person.email, no budget warning. Cells are <td>; the
     // label / property repeat outside the table in the sample-queries
     // block, so we anchor to the cell role.
     await expect(page.getByRole("cell", { name: "Person" })).toBeVisible();
@@ -132,7 +132,7 @@ test.describe("Index Advisor admin tab", () => {
     // Active status badge shows for non-dismissed, in-budget rows.
     await expect(page.getByText(/^active$/)).toBeVisible();
 
-    // Row 2 — Order.total, over budget.
+    // Row 2 - Order.total, over budget.
     await expect(page.getByRole("cell", { name: "Order" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "total" })).toBeVisible();
     await expect(page.getByText(/over budget/i)).toBeVisible();
@@ -144,7 +144,7 @@ test.describe("Index Advisor admin tab", () => {
 
     await expect(page.getByRole("cell", { name: "Person" })).toBeVisible();
 
-    // Tick "Show dismissed" — the mocked endpoint returns an empty
+    // Tick "Show dismissed" - the mocked endpoint returns an empty
     // array for the dismissed view, so the empty-state copy renders.
     await page.getByLabel("Show dismissed").check();
     await expect(page.getByText(/No dismissed suggestions/i)).toBeVisible();

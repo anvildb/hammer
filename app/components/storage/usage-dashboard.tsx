@@ -3,7 +3,7 @@ import { formatBytes } from "~/lib/api-client";
 
 interface Props {
   usage: StorageUsageResponse | null;
-  /** Files for the currently selected bucket — used to compute top-N. */
+  /** Files for the currently selected bucket - used to compute top-N. */
   filesInBucket: StorageFileObject[];
 }
 

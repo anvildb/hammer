@@ -112,7 +112,7 @@ export default function TriggersRoute() {
       );
       setActivityEvents(all.slice(0, 50));
     } catch {
-      // Silently fail — activity log is optional.
+      // Silently fail - activity log is optional.
       setActivityEvents([]);
     } finally {
       setActivityLoading(false);

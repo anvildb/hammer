@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { useConnection } from "~/lib/connection-context";
 import type { CypherResult } from "~/lib/api-client";
@@ -8,16 +8,27 @@ import { loadSettings } from "~/components/settings/types";
 
 type ResultView = "table" | "json" | "graph" | "plan";
 
+const RESULT_VIEWS: ResultView[] = ["table", "json", "graph", "plan"];
+
+function isResultView(value: string | null): value is ResultView {
+  return value !== null && (RESULT_VIEWS as string[]).includes(value);
+}
+
 export default function QueryRoute() {
   const { client, status, selectedSchema } = useConnection();
   const [searchParams] = useSearchParams();
   // `?q=` lets other pages (the home console, links in Help) hand a query off
-  // to the full editor.
+  // to the full editor; `?view=` picks the result panel it lands on.
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "MATCH (n) RETURN n");
   const [result, setResult] = useState<CypherResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
-  const [view, setView] = useState<ResultView>(() => loadSettings().defaultResultView as ResultView);
+  const [view, setView] = useState<ResultView>(() => {
+    const requested = searchParams.get("view");
+    return isResultView(requested)
+      ? requested
+      : (loadSettings().defaultResultView as ResultView);
+  });
 
   async function executeQuery() {
     if (status !== "connected") return;
@@ -53,6 +64,18 @@ export default function QueryRoute() {
       executeQuery();
     }
   }
+
+  // A query handed over through `?q=` runs on arrival, so the caller lands on
+  // results rather than a filled-in editor. Guarded by a ref because this
+  // must happen once, on the first render where the server is reachable.
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (autoRanRef.current) return;
+    if (!searchParams.get("q")) return;
+    if (status !== "connected") return;
+    autoRanRef.current = true;
+    executeQuery();
+  }, [status, searchParams]);
 
   // Extract nodes from result rows.
   // Extract nodes and edges from query result rows.

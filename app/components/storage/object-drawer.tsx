@@ -27,7 +27,7 @@ interface Props {
  *   - `text/*`, `application/json` -> fetched and rendered in a `<pre>`
  *
  * The component requests bytes through the authenticated `downloadObject`
- * API so RLS is respected — preview URLs are object-URLs created in-memory
+ * API so RLS is respected - preview URLs are object-URLs created in-memory
  * (`URL.createObjectURL`) so the bearer token never leaks into the DOM.
  */
 export function ObjectDrawer({
@@ -228,7 +228,7 @@ export function ObjectDrawer({
             Public link
           </h3>
           <p className="text-[10px] text-zinc-500 mb-2">
-            Permanent URL — works without auth as long as the bucket stays
+            Permanent URL - works without auth as long as the bucket stays
             public. Toggle the bucket private to revoke instantly.
           </p>
           <div className="flex items-start gap-1">
@@ -422,7 +422,7 @@ function TransformControls({
           }
           className="w-full bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-zinc-100"
         >
-          <option value="">—</option>
+          <option value="">-</option>
           <option value="cover">cover</option>
           <option value="contain">contain</option>
           <option value="fill">fill</option>
@@ -440,7 +440,7 @@ function TransformControls({
           }
           className="w-full bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-zinc-100"
         >
-          <option value="">—</option>
+          <option value="">-</option>
           <option value="webp">webp</option>
           <option value="jpeg">jpeg</option>
           <option value="png">png</option>

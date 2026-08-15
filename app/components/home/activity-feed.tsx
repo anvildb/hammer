@@ -20,7 +20,7 @@ function badgeClass(type: string): string {
 }
 
 /**
- * Recent server events, straight off `/admin/events`. Admin-only — the route
+ * Recent server events, straight off `/admin/events`. Admin-only - the route
  * renders it only for admins, since the endpoint 403s for everyone else.
  */
 export function ActivityFeed({ live, intervalMs }: ActivityFeedProps) {
@@ -118,7 +118,7 @@ export function ActivityFeed({ live, intervalMs }: ActivityFeedProps) {
 
         {!waiting && !error && !loading && entries.length === 0 && (
           <p className="text-xs text-zinc-500 py-2">
-            {failuresOnly ? "No failures recorded." : "No events yet — run a query to see one here."}
+            {failuresOnly ? "No failures recorded." : "No events yet - run a query to see one here."}
           </p>
         )}
 

@@ -34,7 +34,7 @@ let _qid = 0;
  *   - Otherwise -> TUS 1.0.0 resumable PATCH loop.
  *
  * The chunk size for TUS defaults to 5 MiB on the server, but we don't need
- * to mirror it here — the client's TUS implementation already uses the
+ * to mirror it here - the client's TUS implementation already uses the
  * server-side max (`Tus-Max-Size`) implicitly via the PATCH loop.
  */
 export function UploadZone({

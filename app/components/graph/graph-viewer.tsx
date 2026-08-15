@@ -154,7 +154,7 @@ export function GraphViewer({
       try {
         if (onDeleteNode) await onDeleteNode(nodeId);
       } catch {
-        return; // API error — don't remove from canvas
+        return; // API error - don't remove from canvas
       }
       setNodes((prev) => prev.filter((n) => n.id !== nodeId));
       setEdges((prev) =>

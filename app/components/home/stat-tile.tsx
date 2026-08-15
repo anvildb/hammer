@@ -45,7 +45,7 @@ export function StatTile({
         )}
       </div>
 
-      {/* A missing counter is dimmed so "—" reads as "no reading", not as a
+      {/* A missing counter is dimmed so "-" reads as "no reading", not as a
           value rendered in the tile's accent color. */}
       <div
         className={`text-2xl font-semibold tabular-nums ${

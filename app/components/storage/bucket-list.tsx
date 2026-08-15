@@ -14,7 +14,7 @@ interface Props {
 
 /**
  * Left-rail bucket browser. Each row shows the bucket id, a visibility chip
- * (Public / Private), an object count, and the bucket's total size — pulled
+ * (Public / Private), an object count, and the bucket's total size - pulled
  * from the global usage report so we don't issue one request per bucket.
  *
  * The create form lives at the top, gated on `canWrite`. The size hint
