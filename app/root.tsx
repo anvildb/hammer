@@ -12,7 +12,13 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 export function loader() {
-  return { anvilApiUrl: process.env.VITE_ANVIL_API_URL ?? "" };
+  const allowFlag = (process.env.VITE_ANVIL_ALLOW_SERVER_ADD ?? "").toLowerCase();
+  return {
+    anvilApiUrl: process.env.VITE_ANVIL_API_URL ?? "",
+    // Feature flag: let visitors add/select additional Anvil servers on the
+    // login page (see saved-servers.ts). Off unless explicitly enabled.
+    allowServerAdd: allowFlag === "1" || allowFlag === "true",
+  };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -39,9 +45,9 @@ import { LoginScreen } from "./components/auth/login-screen";
 import { ChangePasswordScreen } from "./components/auth/change-password-screen";
 
 export default function App() {
-  const { anvilApiUrl } = useLoaderData<typeof loader>();
+  const { anvilApiUrl, allowServerAdd } = useLoaderData<typeof loader>();
   return (
-    <ConnectionProvider anvilApiUrl={anvilApiUrl}>
+    <ConnectionProvider anvilApiUrl={anvilApiUrl} allowServerAdd={allowServerAdd}>
       <AuthGate>
         <AppShell>
           <Outlet />

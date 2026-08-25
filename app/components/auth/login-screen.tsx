@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useConnection } from "~/lib/connection-context";
+import { normalizeServerUrl } from "~/lib/saved-servers";
 
 type AuthTab = "password" | "email";
 type OtpStep = "request" | "verify";
@@ -99,6 +100,8 @@ export function LoginScreen() {
             <p className="text-yellow-500 text-xs mt-2">Server not reachable</p>
           )}
         </div>
+
+        <ServerPicker />
 
         {/* Tab switcher */}
         <div className="flex border-b border-zinc-800 mb-0">
@@ -264,6 +267,130 @@ export function LoginScreen() {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Pre-auth server selection, shown only when the Hammer instance was started
+ * with VITE_ANVIL_ALLOW_SERVER_ADD. Visitors can point this instance at
+ * another Anvil server before logging in; the server is remembered by this
+ * browser only after a login against it succeeds.
+ */
+function ServerPicker() {
+  const { allowServerAdd, baseUrl, defaultServerUrl, savedServers, selectServer, removeSavedServer, status } =
+    useConnection();
+  const [adding, setAdding] = useState(false);
+  const [newUrl, setNewUrl] = useState("");
+  const [newName, setNewName] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+
+  if (!allowServerAdd) return null;
+
+  const listed = savedServers.filter((s) => s.url !== defaultServerUrl);
+  // A server just added this session but not yet remembered (no login yet).
+  const unlisted = baseUrl !== defaultServerUrl && !listed.some((s) => s.url === baseUrl);
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError(null);
+    try {
+      const url = normalizeServerUrl(newUrl);
+      selectServer(url, newName.trim() || undefined);
+      setAdding(false);
+      setNewUrl("");
+      setNewName("");
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-1">
+        <label htmlFor="server-select" className="block text-xs text-zinc-400">
+          Server
+        </label>
+        <button
+          type="button"
+          onClick={() => { setAdding(!adding); setAddError(null); }}
+          className="text-xs text-blue-400 hover:text-blue-300"
+        >
+          {adding ? "Cancel" : "+ Add server"}
+        </button>
+      </div>
+
+      {adding ? (
+        <form onSubmit={handleAdd} className="space-y-2 bg-zinc-900 border border-zinc-800 rounded p-3">
+          <input
+            type="text"
+            value={newUrl}
+            onChange={(e) => setNewUrl(e.target.value)}
+            autoFocus
+            placeholder="https://db.example.com:7474"
+            aria-label="Server URL"
+            className="w-full bg-zinc-950 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 font-mono focus:outline-none focus:border-blue-500"
+          />
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Name (optional)"
+            aria-label="Server name"
+            className="w-full bg-zinc-950 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+          />
+          {addError && <p className="text-red-400 text-xs">{addError}</p>}
+          <button
+            type="submit"
+            disabled={!newUrl.trim()}
+            className="w-full py-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-100 text-xs font-medium rounded transition-colors"
+          >
+            Use this server
+          </button>
+          <p className="text-[11px] text-zinc-600">
+            Remembered on this browser after a successful sign-in.
+          </p>
+        </form>
+      ) : (
+        <div className="flex items-center gap-2">
+          <select
+            id="server-select"
+            value={baseUrl}
+            onChange={(e) => selectServer(e.target.value)}
+            className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+          >
+            <option value={defaultServerUrl}>Default ({defaultServerUrl})</option>
+            {listed.map((s) => (
+              <option key={s.id} value={s.url}>
+                {s.name} ({s.url})
+              </option>
+            ))}
+            {unlisted && <option value={baseUrl}>{baseUrl}</option>}
+          </select>
+          <span
+            title={status === "connected" ? "Server reachable" : status === "connecting" ? "Checking..." : "Server not reachable"}
+            className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+              status === "connected" ? "bg-green-500" : status === "connecting" ? "bg-yellow-500" : "bg-red-500"
+            }`}
+          />
+        </div>
+      )}
+
+      {!adding && listed.some((s) => s.url === baseUrl) && (
+        <button
+          type="button"
+          onClick={() => {
+            const current = listed.find((s) => s.url === baseUrl);
+            if (current) {
+              removeSavedServer(current.id);
+              selectServer(defaultServerUrl);
+            }
+          }}
+          className="text-[11px] text-zinc-600 hover:text-red-400 mt-1"
+        >
+          Forget this server
+        </button>
+      )}
     </div>
   );
 }

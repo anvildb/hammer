@@ -2,6 +2,19 @@
 
 Web-based management UI for [Anvil DB](https://anvildb.com). Query your graph, visualize relationships, manage documents, configure security, and administer users - all from the browser.
 
+## Configuration
+
+Environment variables read by the server-side loader at startup:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_ANVIL_API_URL` | derived from the page origin, port 7474 | Anvil server this Hammer instance connects to |
+| `VITE_ANVIL_ALLOW_SERVER_ADD` | off | Set to `true`/`1` to let visitors add and switch Anvil servers on the login page, before authenticating. A server someone adds is remembered by that browser (localStorage) only after a login against it succeeds; a reload reconnects to the last successfully used server. |
+
+```bash
+VITE_ANVIL_ALLOW_SERVER_ADD=true npm run dev
+```
+
 ## Pages
 
 | Page | Description |

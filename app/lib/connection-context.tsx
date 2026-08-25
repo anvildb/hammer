@@ -3,11 +3,20 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   useRef,
   useCallback,
   type ReactNode,
 } from "react";
 import { ApiClient, type ServerInfo } from "./api-client";
+import {
+  type SavedServer,
+  loadActiveServerUrl,
+  loadSavedServers,
+  saveActiveServerUrl,
+  saveSavedServers,
+  upsertSavedServer,
+} from "./saved-servers";
 
 export type ConnectionStatus = "connected" | "disconnected" | "connecting";
 
@@ -31,6 +40,18 @@ interface ConnectionContextValue {
   resendVerification: (email: string) => Promise<{ message: string }>;
   logout: () => void;
   clearMustChangePassword: () => void;
+  /** True when VITE_ANVIL_ALLOW_SERVER_ADD lets visitors pick/add servers on the login page. */
+  allowServerAdd: boolean;
+  /** The server this instance talks to right now. */
+  baseUrl: string;
+  /** The server this Hammer instance is configured with (loader/env or page origin). */
+  defaultServerUrl: string;
+  /** Servers remembered by a previous successful login on this browser. */
+  savedServers: SavedServer[];
+  /** Point the client at another server (login page only; drops any session). */
+  selectServer: (url: string, name?: string) => void;
+  /** Forget a remembered server. */
+  removeSavedServer: (id: string) => void;
 }
 
 const ConnectionContext = createContext<ConnectionContextValue | null>(null);
@@ -39,19 +60,25 @@ const TOKENS_KEY = "anvil_tokens";
 const ANVIL_PORT = "7474";
 
 function resolveBaseUrl(anvilApiUrl?: string): string {
-  if (anvilApiUrl) return anvilApiUrl;
+  if (anvilApiUrl) return anvilApiUrl.replace(/\/$/, "");
   if (typeof window === "undefined") return "http://localhost:7474";
   // Derive from current page: keep protocol (http/https), use Anvil's API port.
   return `${window.location.protocol}//${window.location.hostname}:${ANVIL_PORT}`;
 }
 
-let client = new ApiClient({ baseUrl: resolveBaseUrl() });
-
-export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactNode; anvilApiUrl?: string }) {
-  // Update client base URL if provided via loader.
-  if (anvilApiUrl && client.baseUrl !== anvilApiUrl.replace(/\/$/, "")) {
-    client = new ApiClient({ baseUrl: anvilApiUrl });
-  }
+export function ConnectionProvider({
+  children,
+  anvilApiUrl,
+  allowServerAdd = false,
+}: {
+  children: ReactNode;
+  anvilApiUrl?: string;
+  allowServerAdd?: boolean;
+}) {
+  const defaultServerUrl = resolveBaseUrl(anvilApiUrl);
+  const [baseUrl, setBaseUrl] = useState(defaultServerUrl);
+  // One client per server; a new instance drops in-flight refresh state.
+  const client = useMemo(() => new ApiClient({ baseUrl }), [baseUrl]);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,9 +86,22 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [selectedSchema, setSelectedSchema] = useState<Schema>("public");
+  const [savedServers, setSavedServers] = useState<SavedServer[]>([]);
+  /** Name the visitor gave the not-yet-remembered server they added, if any. */
+  const pendingNameRef = useRef<string | undefined>(undefined);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Restore tokens from localStorage on mount.
+  // Restore remembered servers and the last active server on mount.
+  useEffect(() => {
+    if (!allowServerAdd) return;
+    setSavedServers(loadSavedServers());
+    const active = loadActiveServerUrl();
+    if (active && active !== defaultServerUrl) setBaseUrl(active);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowServerAdd]);
+
+  // Restore tokens from localStorage on mount (and re-apply them to the
+  // client for the restored active server once it exists).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(TOKENS_KEY);
@@ -82,7 +122,7 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
     } catch {
       // Ignore.
     }
-  }, []);
+  }, [client]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +149,7 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
       cancelled = true;
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [client]);
 
   // When tokens are refreshed, persist BOTH new values to localStorage and
   // update the React-visible username/roles from the rotated access token.
@@ -144,35 +184,68 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
     setUserRoles([]);
   };
 
-  const login = useCallback(async (username: string, password: string) => {
-    const result = await client.login(username, password);
-    client.refreshToken = result.refreshToken;
-    localStorage.setItem(TOKENS_KEY, JSON.stringify(result));
-    setIsAuthenticated(true);
-    setCurrentUser(username);
-    setMustChangePassword(result.mustChangePassword ?? false);
-    const payload = parseJwtPayload(result.accessToken);
-    setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
-  }, []);
+  /** After a successful login: remember the server this instance now uses. */
+  const rememberCurrentServer = useCallback(() => {
+    if (!allowServerAdd) return;
+    // Capture the pending name NOW: state updaters run lazily, after the ref
+    // below has already been cleared.
+    const pendingName = pendingNameRef.current;
+    pendingNameRef.current = undefined;
+    if (baseUrl !== defaultServerUrl) {
+      setSavedServers((prev) => {
+        const next = upsertSavedServer(prev, baseUrl, pendingName);
+        saveSavedServers(next);
+        return next;
+      });
+      saveActiveServerUrl(baseUrl);
+    } else {
+      saveActiveServerUrl(null);
+    }
+  }, [allowServerAdd, baseUrl, defaultServerUrl]);
 
-  const otpRequest = useCallback(async (email: string) => {
-    return client.otpRequest(email);
-  }, []);
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const result = await client.login(username, password);
+      client.refreshToken = result.refreshToken;
+      localStorage.setItem(TOKENS_KEY, JSON.stringify(result));
+      setIsAuthenticated(true);
+      setCurrentUser(username);
+      setMustChangePassword(result.mustChangePassword ?? false);
+      const payload = parseJwtPayload(result.accessToken);
+      setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
+      rememberCurrentServer();
+    },
+    [client, rememberCurrentServer],
+  );
 
-  const otpVerify = useCallback(async (email: string, code: string) => {
-    const result = await client.otpVerify(email, code);
-    client.refreshToken = result.refreshToken;
-    localStorage.setItem(TOKENS_KEY, JSON.stringify(result));
-    setIsAuthenticated(true);
-    const payload = parseJwtPayload(result.accessToken);
-    setCurrentUser(payload?.username as string ?? email.split("@")[0]);
-    setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
-    setMustChangePassword(false);
-  }, []);
+  const otpRequest = useCallback(
+    async (email: string) => {
+      return client.otpRequest(email);
+    },
+    [client],
+  );
 
-  const resendVerification = useCallback(async (email: string) => {
-    return client.resendVerification(email);
-  }, []);
+  const otpVerify = useCallback(
+    async (email: string, code: string) => {
+      const result = await client.otpVerify(email, code);
+      client.refreshToken = result.refreshToken;
+      localStorage.setItem(TOKENS_KEY, JSON.stringify(result));
+      setIsAuthenticated(true);
+      const payload = parseJwtPayload(result.accessToken);
+      setCurrentUser((payload?.username as string) ?? email.split("@")[0]);
+      setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
+      setMustChangePassword(false);
+      rememberCurrentServer();
+    },
+    [client, rememberCurrentServer],
+  );
+
+  const resendVerification = useCallback(
+    async (email: string) => {
+      return client.resendVerification(email);
+    },
+    [client],
+  );
 
   const clearMustChangePassword = useCallback(() => {
     setMustChangePassword(false);
@@ -189,13 +262,72 @@ export function ConnectionProvider({ children, anvilApiUrl }: { children: ReactN
     setIsAuthenticated(false);
     setCurrentUser(null);
     setUserRoles([]);
-  }, []);
+  }, [client]);
+
+  /** Login-page server switch: drop any stored session, re-point the client. */
+  const selectServer = useCallback(
+    (url: string, name?: string) => {
+      if (!allowServerAdd) return;
+      const target = url.replace(/\/$/, "");
+      pendingNameRef.current = name;
+      if (target === baseUrl) return;
+      try {
+        localStorage.removeItem(TOKENS_KEY);
+      } catch {
+        // Ignore.
+      }
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setUserRoles([]);
+      setMustChangePassword(false);
+      setServerInfo(null);
+      setStatus("connecting");
+      setBaseUrl(target);
+    },
+    [allowServerAdd, baseUrl],
+  );
+
+  const removeSavedServer = useCallback(
+    (id: string) => {
+      setSavedServers((prev) => {
+        const removed = prev.find((s) => s.id === id);
+        const next = prev.filter((s) => s.id !== id);
+        saveSavedServers(next);
+        if (removed && loadActiveServerUrl() === removed.url) saveActiveServerUrl(null);
+        return next;
+      });
+    },
+    [],
+  );
 
   const isAdmin = userRoles.includes("admin");
 
   return (
     <ConnectionContext.Provider
-      value={{ client, status, serverInfo, isAuthenticated, mustChangePassword, currentUser, userRoles, isAdmin, selectedSchema, setSelectedSchema, login, otpRequest, otpVerify, resendVerification, logout, clearMustChangePassword }}
+      value={{
+        client,
+        status,
+        serverInfo,
+        isAuthenticated,
+        mustChangePassword,
+        currentUser,
+        userRoles,
+        isAdmin,
+        selectedSchema,
+        setSelectedSchema,
+        login,
+        otpRequest,
+        otpVerify,
+        resendVerification,
+        logout,
+        clearMustChangePassword,
+        allowServerAdd,
+        baseUrl,
+        defaultServerUrl,
+        savedServers,
+        selectServer,
+        removeSavedServer,
+      }}
     >
       {children}
     </ConnectionContext.Provider>
