@@ -29,7 +29,29 @@ export function ServerSettings() {
     setError(null);
     try {
       const result = await client.listSettings();
-      setSettings(result.settings);
+      let list = result.settings;
+      // Always offer server.base_url for editing, even when the connected
+      // server predates it in the settings registry — the row renders with
+      // the normal Edit button and Save goes through the same API call (an
+      // older server will answer with its own error in the banner above).
+      if (!list.some((s) => s.key === "server.base_url")) {
+        list = [
+          ...list,
+          {
+            key: "server.base_url",
+            value: "",
+            type: "string",
+            description:
+              "Public base URL for links in outgoing emails and signed URLs (e.g. https://anvil.devforge.io:7474)",
+            category: "server",
+            source: "default",
+            read_only: false,
+            updated_at: 0,
+            updated_by: "",
+          },
+        ];
+      }
+      setSettings(list);
     } catch (err) {
       setError(String(err));
     } finally {
