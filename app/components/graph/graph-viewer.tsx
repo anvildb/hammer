@@ -43,6 +43,17 @@ export function GraphViewer({
   });
   const [nodes, setNodes] = useState<GraphNode[]>(() => initialData.nodes);
   const [edges, setEdges] = useState<GraphEdge[]>(() => initialData.edges);
+  // Re-sync when the caller hands over a new dataset (e.g. the same node set
+  // but a different edge set after re-running a query), since the state above
+  // is only seeded on mount.
+  useEffect(() => {
+    setNodes(initialData.nodes);
+    setEdges(initialData.edges);
+    setHiddenNodes(new Set());
+    setSelectedNodes(new Set());
+    setInspectedNode(null);
+    setInspectedEdge(null);
+  }, [initialData]);
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [inspectedNode, setInspectedNode] = useState<GraphNode | null>(null);
   const [inspectedEdge, setInspectedEdge] = useState<GraphEdge | null>(null);

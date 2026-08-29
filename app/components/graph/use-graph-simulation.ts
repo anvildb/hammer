@@ -212,6 +212,15 @@ function applyStaticLayout(
   const n = nodes.length;
   if (n === 0) return;
 
+  // The canvas only draws edges whose endpoints are node objects. d3's
+  // forceLink performs that resolution for the force layout; static layouts
+  // must do it themselves or every edge is silently skipped.
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  for (const e of _edges) {
+    if (typeof e.source === "string") e.source = byId.get(e.source) ?? e.source;
+    if (typeof e.target === "string") e.target = byId.get(e.target) ?? e.target;
+  }
+
   switch (layout) {
     case "circular": {
       const cx = width / 2;

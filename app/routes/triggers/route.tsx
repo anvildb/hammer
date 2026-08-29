@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useConnection } from "~/lib/connection-context";
 import type { CypherResult, EventEntry } from "~/lib/api-client";
 
@@ -38,11 +38,41 @@ function parseTriggers(result: CypherResult): StoredTrigger[] {
   });
 }
 
+type SortKey = "name" | "timing" | "event" | "target" | "priority";
+
 export default function TriggersRoute() {
   const { client, status } = useConnection();
 
   // Trigger list
   const [triggers, setTriggers] = useState<StoredTrigger[]>([]);
+  const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const sortedTriggers = useMemo(() => {
+    const list = [...triggers];
+    list.sort((a, b) => {
+      let cmp: number;
+      if (sortBy === "priority") {
+        cmp = a.priority - b.priority;
+      } else {
+        cmp = a[sortBy].localeCompare(b[sortBy], undefined, {
+          sensitivity: "base",
+        });
+      }
+      if (cmp === 0) cmp = a.name.localeCompare(b.name);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [triggers, sortBy, sortDir]);
+
+  const clickColumn = (key: SortKey) => {
+    if (sortBy === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +81,7 @@ export default function TriggersRoute() {
   const [formTiming, setFormTiming] = useState("AFTER");
   const [formEvent, setFormEvent] = useState("INSERT");
   const [formTargetType, setFormTargetType] = useState<"label" | "collection">(
-    "collection"
+    "collection",
   );
   const [formTarget, setFormTarget] = useState("");
   const [formPriority, setFormPriority] = useState("100");
@@ -108,7 +138,7 @@ export default function TriggersRoute() {
       const errRes = await client.events(errParams);
       // Merge and sort by timestamp desc.
       const all = [...res.events, ...errRes.events].sort(
-        (a, b) => b.timestamp - a.timestamp
+        (a, b) => b.timestamp - a.timestamp,
       );
       setActivityEvents(all.slice(0, 50));
     } catch {
@@ -212,20 +242,101 @@ export default function TriggersRoute() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-zinc-900 border-b border-zinc-800">
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
-                      Name
+                    <th
+                      className="text-left px-3 py-2 text-zinc-400 font-medium"
+                      aria-sort={
+                        sortBy === "name"
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => clickColumn("name")}
+                        className="hover:text-zinc-200"
+                      >
+                        Name{" "}
+                        {sortBy === "name" && (sortDir === "asc" ? "▲" : "▼")}
+                      </button>
                     </th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
-                      Timing
+                    <th
+                      className="text-left px-3 py-2 text-zinc-400 font-medium"
+                      aria-sort={
+                        sortBy === "timing"
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => clickColumn("timing")}
+                        className="hover:text-zinc-200"
+                      >
+                        Timing{" "}
+                        {sortBy === "timing" && (sortDir === "asc" ? "▲" : "▼")}
+                      </button>
                     </th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
-                      Event
+                    <th
+                      className="text-left px-3 py-2 text-zinc-400 font-medium"
+                      aria-sort={
+                        sortBy === "event"
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => clickColumn("event")}
+                        className="hover:text-zinc-200"
+                      >
+                        Event{" "}
+                        {sortBy === "event" && (sortDir === "asc" ? "▲" : "▼")}
+                      </button>
                     </th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
-                      Target
+                    <th
+                      className="text-left px-3 py-2 text-zinc-400 font-medium"
+                      aria-sort={
+                        sortBy === "target"
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => clickColumn("target")}
+                        className="hover:text-zinc-200"
+                      >
+                        Target{" "}
+                        {sortBy === "target" && (sortDir === "asc" ? "▲" : "▼")}
+                      </button>
                     </th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
-                      Priority
+                    <th
+                      className="text-left px-3 py-2 text-zinc-400 font-medium"
+                      aria-sort={
+                        sortBy === "priority"
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => clickColumn("priority")}
+                        className="hover:text-zinc-200"
+                      >
+                        Priority{" "}
+                        {sortBy === "priority" &&
+                          (sortDir === "asc" ? "▲" : "▼")}
+                      </button>
                     </th>
                     <th className="text-left px-3 py-2 text-zinc-400 font-medium">
                       Status
@@ -237,7 +348,7 @@ export default function TriggersRoute() {
                   </tr>
                 </thead>
                 <tbody>
-                  {triggers.map((t, i) => (
+                  {sortedTriggers.map((t, i) => (
                     <tr
                       key={`${t.name}-${i}`}
                       className={`border-b border-zinc-800/50 hover:bg-zinc-900/50 ${
@@ -254,7 +365,12 @@ export default function TriggersRoute() {
                             className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-zinc-200 transition-opacity shrink-0"
                             title="Copy CREATE TRIGGER statement"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 16 16"
+                              fill="currentColor"
+                              className="w-3 h-3"
+                            >
                               <path d="M5.5 3.5A1.5 1.5 0 0 1 7 2h5.5A1.5 1.5 0 0 1 14 3.5V11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 11V3.5Z" />
                               <path d="M3 5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 3 14h6a1.5 1.5 0 0 0 1.5-1.5V13H7a2.5 2.5 0 0 1-2.5-2.5V5H3Z" />
                             </svg>
@@ -286,7 +402,10 @@ export default function TriggersRoute() {
                           {t.event}
                         </span>
                       </td>
-                      <td className="px-3 py-2 font-mono text-xs max-w-40 truncate" title={t.target}>
+                      <td
+                        className="px-3 py-2 font-mono text-xs max-w-40 truncate"
+                        title={t.target}
+                      >
                         {t.target}
                       </td>
                       <td className="px-3 py-2 text-xs text-zinc-400">
@@ -440,9 +559,7 @@ export default function TriggersRoute() {
                 <select
                   value={formTargetType}
                   onChange={(e) =>
-                    setFormTargetType(
-                      e.target.value as "label" | "collection"
-                    )
+                    setFormTargetType(e.target.value as "label" | "collection")
                   }
                   className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
                 >
@@ -454,7 +571,11 @@ export default function TriggersRoute() {
                 <label className="block text-xs text-zinc-400 mb-1">
                   Target{" "}
                   <span className="text-zinc-600">
-                    ({formTargetType === "label" ? "e.g. Person" : "e.g. auth.users"})
+                    (
+                    {formTargetType === "label"
+                      ? "e.g. Person"
+                      : "e.g. auth.users"}
+                    )
                   </span>
                 </label>
                 <input
@@ -609,7 +730,10 @@ export default function TriggersRoute() {
                             {evt.success ? "OK" : "FAIL"}
                           </span>
                         </td>
-                        <td className="px-3 py-1.5 text-xs text-red-400 max-w-48 truncate" title={evt.error ?? ""}>
+                        <td
+                          className="px-3 py-1.5 text-xs text-red-400 max-w-48 truncate"
+                          title={evt.error ?? ""}
+                        >
                           {evt.error || ""}
                         </td>
                       </tr>
@@ -621,7 +745,8 @@ export default function TriggersRoute() {
 
             {!activityLoading && activityEvents.length === 0 && (
               <p className="text-sm text-zinc-500">
-                No trigger activity recorded. Click "Load Activity" to fetch recent trigger firings.
+                No trigger activity recorded. Click "Load Activity" to fetch
+                recent trigger firings.
               </p>
             )}
           </div>
@@ -637,7 +762,9 @@ export default function TriggersRoute() {
               onClick={async () => {
                 setDepLoading(true);
                 try {
-                  const res = await client.cypher({ query: "SHOW DEPENDENCIES" });
+                  const res = await client.cypher({
+                    query: "SHOW DEPENDENCIES",
+                  });
                   setDepColumns(res.columns);
                   setDepRows(
                     res.rows.map((row) => {
@@ -646,7 +773,7 @@ export default function TriggersRoute() {
                         obj[col] = String(row[i] ?? "");
                       });
                       return obj;
-                    })
+                    }),
                   );
                 } catch {
                   setDepRows([]);
@@ -679,7 +806,7 @@ export default function TriggersRoute() {
                   <tbody>
                     {depRows.map((row, i) => {
                       const isWarning = Object.values(row).some((v) =>
-                        v.startsWith("\u26a0")
+                        v.startsWith("\u26a0"),
                       );
                       return (
                         <tr
@@ -709,7 +836,8 @@ export default function TriggersRoute() {
 
             {!depLoading && depRows.length === 0 && (
               <p className="text-sm text-zinc-500">
-                Click "Analyze Dependencies" to map trigger, function, and sync rule relationships.
+                Click "Analyze Dependencies" to map trigger, function, and sync
+                rule relationships.
               </p>
             )}
           </div>

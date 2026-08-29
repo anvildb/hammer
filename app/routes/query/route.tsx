@@ -140,30 +140,49 @@ export default function QueryRoute() {
       return;
     }
 
-    // Otherwise, fetch edges from the graph endpoint.
+    // Otherwise, fetch the relationships among the returned nodes. This goes
+    // through Cypher (scoped to the selected schema) rather than the /graph
+    // endpoint, which only exposes public-schema nodes and would drop every
+    // edge touching e.g. an auth User node.
     const nodeIds = new Set(resultData.nodes.map((n) => n.id));
+    const idList = [...nodeIds].filter((id) => /^\d+$/.test(id)).join(", ");
+    if (!idList) {
+      setGraphData({ nodes: resultData.nodes, edges: [] });
+      return;
+    }
+    let cancelled = false;
     client
-      .getGraph("default")
-      .then((full) => {
-        const edges: GraphEdge[] = (full.edges ?? [])
-          .filter((e: Record<string, unknown>) => {
-            const src = String(e.source ?? "");
-            const tgt = String(e.target ?? "");
-            return nodeIds.has(src) && nodeIds.has(tgt);
-          })
-          .map((e: Record<string, unknown>) => ({
-            id: String(e.id ?? ""),
-            source: String(e.source ?? ""),
-            target: String(e.target ?? ""),
-            type: String(e.type ?? (e as Record<string, unknown>).edge_type ?? ""),
-            properties: (e.properties ?? {}) as Record<string, unknown>,
-          }));
+      .cypher({
+        query: `MATCH (a)-[r]->(b) WHERE id(a) IN [${idList}] AND id(b) IN [${idList}] RETURN r`,
+        database: selectedSchema,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const edges: GraphEdge[] = [];
+        const seen = new Set<string>();
+        for (const row of res.rows) {
+          for (const cell of row) {
+            if (!cell || typeof cell !== "object" || Array.isArray(cell)) continue;
+            const obj = cell as Record<string, unknown>;
+            if (obj._type === undefined || obj._start === undefined || obj._end === undefined) continue;
+            const id = String(obj._id ?? "");
+            const src = String(obj._start);
+            const tgt = String(obj._end);
+            if (!id || seen.has(id) || !nodeIds.has(src) || !nodeIds.has(tgt)) continue;
+            seen.add(id);
+            const { _id: _, _type: __, _start: ___, _end: ____, ...rest } = obj;
+            edges.push({ id, source: src, target: tgt, type: String(obj._type), properties: rest });
+          }
+        }
         setGraphData({ nodes: resultData.nodes, edges });
       })
       .catch(() => {
-        setGraphData({ nodes: resultData.nodes, edges: [] });
+        if (!cancelled) setGraphData({ nodes: resultData.nodes, edges: [] });
       });
-  }, [resultData, client]);
+    return () => {
+      cancelled = true;
+    };
+  }, [resultData, client, selectedSchema]);
 
   const hasGraphData = graphData.nodes.length > 0;
 
