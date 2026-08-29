@@ -9,13 +9,47 @@ export default function GraphRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load through Cypher scoped to the selected schema rather than the
+  // /db/{name}/graph endpoint, which only exposes public-schema nodes and
+  // therefore drops every relationship touching e.g. an auth User node.
   async function refreshGraph() {
     try {
-      const json = await client.getGraph("default");
-      setData({
-        nodes: (json.nodes ?? []) as unknown as GraphData["nodes"],
-        edges: (json.edges ?? []) as unknown as GraphData["edges"],
-      });
+      const [nodeRes, edgeRes] = await Promise.all([
+        client.cypher({ query: "MATCH (n) RETURN n", database: selectedSchema }),
+        client.cypher({ query: "MATCH ()-[r]->() RETURN r", database: selectedSchema }),
+      ]);
+      const nodes: GraphData["nodes"] = [];
+      const seenNodes = new Set<string>();
+      for (const row of nodeRes.rows) {
+        for (const cell of row) {
+          if (!cell || typeof cell !== "object" || Array.isArray(cell)) continue;
+          const obj = cell as Record<string, unknown>;
+          const labels = Array.isArray(obj._labels) ? obj._labels : Array.isArray(obj.labels) ? obj.labels : null;
+          if (!labels) continue;
+          const id = String(obj._id ?? obj.id ?? "");
+          if (!id || seenNodes.has(id)) continue;
+          seenNodes.add(id);
+          const { _id: _, _labels: __, _key: ___, _collection: ____, ...rest } = obj;
+          nodes.push({ id, labels: labels as string[], properties: rest });
+        }
+      }
+      const edges: GraphData["edges"] = [];
+      const seenEdges = new Set<string>();
+      for (const row of edgeRes.rows) {
+        for (const cell of row) {
+          if (!cell || typeof cell !== "object" || Array.isArray(cell)) continue;
+          const obj = cell as Record<string, unknown>;
+          if (obj._type === undefined || obj._start === undefined || obj._end === undefined) continue;
+          const id = String(obj._id ?? "");
+          const source = String(obj._start);
+          const target = String(obj._end);
+          if (!id || seenEdges.has(id) || !seenNodes.has(source) || !seenNodes.has(target)) continue;
+          seenEdges.add(id);
+          const { _id: _, _type: __, _start: ___, _end: ____, ...rest } = obj;
+          edges.push({ id, source, target, type: String(obj._type), properties: rest });
+        }
+      }
+      setData({ nodes, edges });
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -32,7 +66,7 @@ export default function GraphRoute() {
     });
 
     return () => { cancelled = true; };
-  }, [status]);
+  }, [status, selectedSchema]);
 
   if (status !== "connected") {
     return (
