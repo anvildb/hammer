@@ -110,8 +110,8 @@ export function useGraphSimulation({
     }
 
     // Scale orbit radius based on neighbor count so labels don't overlap.
-    const minRadius = 100;
-    const minSpacing = 50; // minimum arc distance between neighbors
+    const minRadius = 200;
+    const minSpacing = 100; // minimum arc distance between neighbors
     const spacingRadius = (neighborList.length * minSpacing) / (2 * Math.PI);
     const orbitRadius = Math.max(minRadius, spacingRadius);
     // Compute evenly-spaced target positions for each neighbor.
