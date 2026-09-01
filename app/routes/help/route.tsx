@@ -1470,7 +1470,10 @@ SYNC LABEL User TO COLLECTION user_cache KEY username INCLUDE username, role SKI
 SHOW SYNC RULES
 
 -- Drop a sync rule by ID
-DROP SYNC RULE 1`}</Code>
+DROP SYNC RULE 1
+
+-- List collections (name, schema, id, document count)
+SHOW COLLECTIONS`}</Code>
     </>
   );
 }
