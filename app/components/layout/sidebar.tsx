@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { useConnection, SCHEMAS } from "~/lib/connection-context";
+import { useConnection, SCHEMAS, appSchemaName } from "~/lib/connection-context";
 
 const navItems = [
   { path: "/query", label: "Cypher", icon: "terminal", schemaAware: false, adminOnly: false },
@@ -8,6 +8,7 @@ const navItems = [
   { path: "/schema", label: "Schema", icon: "database", schemaAware: true, adminOnly: false },
   { path: "/documents", label: "Documents", icon: "file-text", schemaAware: true, adminOnly: false },
   { path: "/storage", label: "Storage", icon: "archive", schemaAware: false, adminOnly: false },
+  { path: "/apps", label: "Apps", icon: "layers", schemaAware: false, adminOnly: false },
   { path: "/policies", label: "Policies", icon: "shield", schemaAware: true, adminOnly: true },
   { path: "/functions", label: "Functions", icon: "zap", schemaAware: true, adminOnly: true },
   { path: "/triggers", label: "Triggers", icon: "bolt", schemaAware: false, adminOnly: true },
@@ -24,9 +25,13 @@ interface SidebarProps {
 
 export function Sidebar({ favorites }: SidebarProps) {
   const location = useLocation();
-  const { selectedSchema, setSelectedSchema, isAdmin } = useConnection();
+  const { selectedSchema, setSelectedSchema, isAdmin, apps } = useConnection();
 
-  const visibleSchemas = isAdmin ? SCHEMAS : SCHEMAS.filter((s) => s !== "auth");
+  const baseSchemas: string[] = isAdmin ? [...SCHEMAS] : SCHEMAS.filter((s) => s !== "auth");
+  const visibleSchemas: { value: string; label: string }[] = [
+    ...baseSchemas.map((s) => ({ value: s, label: s })),
+    ...apps.map((a) => ({ value: appSchemaName(a.slug), label: `${appSchemaName(a.slug)} — ${a.name}` })),
+  ];
   const visibleNav = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
@@ -45,11 +50,11 @@ export function Sidebar({ favorites }: SidebarProps) {
         <label className="text-xs text-zinc-500 uppercase tracking-wider">Schema</label>
         <select
           value={selectedSchema}
-          onChange={(e) => setSelectedSchema(e.target.value as typeof selectedSchema)}
+          onChange={(e) => setSelectedSchema(e.target.value)}
           className="mt-1 w-full bg-zinc-800 text-zinc-200 text-sm rounded px-2 py-1 border border-zinc-700 focus:border-zinc-500 focus:outline-none"
         >
           {visibleSchemas.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select>
       </div>

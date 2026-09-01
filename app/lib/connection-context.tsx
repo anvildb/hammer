@@ -1,3 +1,4 @@
+import type { AppSummary } from "~/lib/api-client";
 import {
   createContext,
   useContext,
@@ -20,8 +21,14 @@ import {
 
 export type ConnectionStatus = "connected" | "disconnected" | "connecting";
 
+/** Built-in schemas; app schemas (`app_<slug>`) are appended at runtime. */
 export const SCHEMAS = ["public", "auth", "system"] as const;
-export type Schema = (typeof SCHEMAS)[number];
+export type Schema = string;
+
+/** The schema name owned by an app (mirrors the server's `app_<slug>`). */
+export function appSchemaName(slug: string): string {
+  return `app_${slug}`;
+}
 
 interface ConnectionContextValue {
   client: ApiClient;
@@ -34,6 +41,9 @@ interface ConnectionContextValue {
   isAdmin: boolean;
   selectedSchema: Schema;
   setSelectedSchema: (schema: Schema) => void;
+  /** Apps the current user can access (server admins: all). */
+  apps: AppSummary[];
+  refreshApps: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   otpRequest: (email: string) => Promise<{ message: string; expires_in_seconds: number }>;
   otpVerify: (email: string, code: string) => Promise<void>;
@@ -86,6 +96,7 @@ export function ConnectionProvider({
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [selectedSchema, setSelectedSchema] = useState<Schema>("public");
+  const [apps, setApps] = useState<AppSummary[]>([]);
   const [savedServers, setSavedServers] = useState<SavedServer[]>([]);
   /** Name the visitor gave the not-yet-remembered server they added, if any. */
   const pendingNameRef = useRef<string | undefined>(undefined);
@@ -302,6 +313,35 @@ export function ConnectionProvider({
 
   const isAdmin = userRoles.includes("admin");
 
+  // Apps drive the dynamic schema list (APPS.md Phase 4).
+  const refreshApps = useCallback(async () => {
+    try {
+      setApps(await client.listApps());
+    } catch {
+      setApps([]);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    if (status !== "connected" || !isAuthenticated) {
+      setApps([]);
+      return;
+    }
+    refreshApps();
+  }, [status, isAuthenticated, refreshApps]);
+
+  // Drop a selected app schema that no longer exists.
+  useEffect(() => {
+    if (
+      selectedSchema.startsWith("app_") &&
+      status === "connected" &&
+      isAuthenticated &&
+      !apps.some((a) => appSchemaName(a.slug) === selectedSchema)
+    ) {
+      setSelectedSchema("public");
+    }
+  }, [apps, selectedSchema, status, isAuthenticated]);
+
   return (
     <ConnectionContext.Provider
       value={{
@@ -315,6 +355,8 @@ export function ConnectionProvider({
         isAdmin,
         selectedSchema,
         setSelectedSchema,
+        apps,
+        refreshApps,
         login,
         otpRequest,
         otpVerify,

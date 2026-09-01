@@ -292,6 +292,57 @@ export interface ServiceAccount {
   service_role: boolean;
 }
 
+// -- Apps / projects (APPS.md) --
+
+export type AppPrivilege = "reader" | "editor" | "admin";
+
+export interface AppSummary {
+  id: string;
+  slug: string;
+  name: string;
+  created_by: string;
+  created_on: number;
+  enabled: boolean;
+  /** Caller's privilege in the app; "admin" for server admins. */
+  privilege?: AppPrivilege;
+}
+
+export interface AppMember {
+  app_id: string;
+  user_id: string;
+  username: string;
+  privilege: AppPrivilege;
+  added_by: string;
+  added_on: number;
+}
+
+export interface AppLabels {
+  app_id: string;
+  schema: string;
+  labels: string[];
+}
+
+export interface AppSettingEntry {
+  key: string;
+  value: string;
+  source: "app" | "global";
+}
+
+export interface AppEmailTemplate {
+  name: string;
+  subject: string;
+  html: string;
+  text: string;
+  custom: boolean;
+}
+
+export interface AppEmailPreview {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}
+
 export interface ApiKey {
   id: string;
   service_account_id: string;
@@ -467,6 +518,94 @@ export class ApiClient {
 
   async deleteServiceAccount(id: string): Promise<void> {
     await this.delete(`/auth/service-accounts/${encodeURIComponent(id)}`);
+  }
+
+  // -- Apps / projects --
+
+  async listApps(): Promise<AppSummary[]> {
+    return this.get("/apps");
+  }
+
+  async createApp(req: { slug: string; name: string }): Promise<AppSummary> {
+    return this.post("/apps", req);
+  }
+
+  async getApp(id: string): Promise<AppSummary> {
+    return this.get(`/apps/${encodeURIComponent(id)}`);
+  }
+
+  async updateApp(id: string, patch: { name?: string; enabled?: boolean }): Promise<AppSummary> {
+    return this.request("PATCH", `/apps/${encodeURIComponent(id)}`, patch);
+  }
+
+  async deleteApp(id: string): Promise<void> {
+    await this.delete(`/apps/${encodeURIComponent(id)}`);
+  }
+
+  async listAppMembers(id: string): Promise<AppMember[]> {
+    return this.get(`/apps/${encodeURIComponent(id)}/members`);
+  }
+
+  async putAppMember(id: string, user: string, privilege: AppPrivilege): Promise<AppMember> {
+    return this.put(`/apps/${encodeURIComponent(id)}/members/${encodeURIComponent(user)}`, {
+      privilege,
+    });
+  }
+
+  async deleteAppMember(id: string, user: string): Promise<void> {
+    await this.delete(`/apps/${encodeURIComponent(id)}/members/${encodeURIComponent(user)}`);
+  }
+
+  async listAppLabels(id: string): Promise<AppLabels> {
+    return this.get(`/apps/${encodeURIComponent(id)}/labels`);
+  }
+
+  async putAppLabel(id: string, label: string): Promise<AppLabels> {
+    return this.put(`/apps/${encodeURIComponent(id)}/labels/${encodeURIComponent(label)}`, {});
+  }
+
+  async deleteAppLabel(id: string, label: string): Promise<AppLabels> {
+    return this.delete(`/apps/${encodeURIComponent(id)}/labels/${encodeURIComponent(label)}`);
+  }
+
+  async getAppSettings(id: string): Promise<AppSettingEntry[]> {
+    return this.get(`/apps/${encodeURIComponent(id)}/settings`);
+  }
+
+  async putAppSettings(id: string, values: Record<string, string>): Promise<AppSettingEntry[]> {
+    return this.put(`/apps/${encodeURIComponent(id)}/settings`, values);
+  }
+
+  async deleteAppSetting(id: string, key: string): Promise<AppSettingEntry[]> {
+    return this.delete(`/apps/${encodeURIComponent(id)}/settings/${encodeURIComponent(key)}`);
+  }
+
+  async listAppEmailTemplates(id: string): Promise<AppEmailTemplate[]> {
+    return this.get(`/apps/${encodeURIComponent(id)}/email-templates`);
+  }
+
+  async putAppEmailTemplate(
+    id: string,
+    name: string,
+    parts: { subject?: string; html?: string; text?: string },
+  ): Promise<AppEmailTemplate> {
+    return this.put(
+      `/apps/${encodeURIComponent(id)}/email-templates/${encodeURIComponent(name)}`,
+      parts,
+    );
+  }
+
+  async deleteAppEmailTemplate(id: string, name: string): Promise<AppEmailTemplate> {
+    return this.delete(
+      `/apps/${encodeURIComponent(id)}/email-templates/${encodeURIComponent(name)}`,
+    );
+  }
+
+  async previewAppEmailTemplate(id: string, name: string, to?: string): Promise<AppEmailPreview> {
+    return this.post(
+      `/apps/${encodeURIComponent(id)}/email-templates/${encodeURIComponent(name)}/preview`,
+      { to },
+    );
   }
 
   async listApiKeys(accountId: string): Promise<ApiKey[]> {
