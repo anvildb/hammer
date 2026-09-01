@@ -26,6 +26,7 @@ type SectionId =
   | "triggers"
   | "rls"
   | "auth"
+  | "apps"
   | "data-import"
   | "edge-functions"
   | "observability"
@@ -83,6 +84,7 @@ const sections: NavItem[] = [
   { id: "triggers", title: "Triggers" },
   { id: "rls", title: "Row-Level Security" },
   { id: "auth", title: "Authentication" },
+  { id: "apps", title: "Apps & Projects" },
   {
     id: "storage-overview",
     title: "File Storage",
@@ -290,6 +292,7 @@ export default function HelpRoute() {
           {active === "triggers" && <TriggersSection />}
           {active === "rls" && <RLSSection />}
           {active === "auth" && <AuthSection />}
+          {active === "apps" && <AppsSection />}
           {active === "storage-overview" && <StorageOverviewSection />}
           {active === "storage-quickstart" && <StorageQuickstartSection />}
           {active === "storage-buckets" && <StorageBucketsSection />}
@@ -2161,6 +2164,72 @@ SHOW POLICIES
 SHOW POLICIES ON :Label
 ENABLE / DISABLE / FORCE ROW LEVEL SECURITY ON :Label
 SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
+    </>
+  );
+}
+
+function AppsSection() {
+  return (
+    <>
+      <H1>Apps & Projects</H1>
+      <P>
+        An app is a tenant inside this server: it owns the schema{" "}
+        <InlineCode>app_&lt;slug&gt;</InlineCode>, a membership list linking back to{" "}
+        <InlineCode>auth.users</InlineCode> with a per-app privilege, and its own settings
+        and email templates. Manage them on the <strong>Apps</strong> page, over REST, or
+        with the Cypher DDL below. Every app you belong to also appears in the sidebar's
+        schema dropdown so the Cypher, Documents and Schema pages can work inside it.
+      </P>
+
+      <H2>Privileges</H2>
+      <Table
+        headers={["Privilege", "Can"]}
+        rows={[
+          ["reader", "Read the app's data"],
+          ["editor", "Write data, create collections, bind labels"],
+          ["admin", "Manage members, settings and email templates, unbind labels, drop app collections"],
+          ["server admin", "Create and delete apps; implicit admin in every app"],
+        ]}
+      />
+
+      <H2>Cypher DDL</H2>
+      <Code>{`CREATE APP 'crm' NAME 'Customer CRM'      -- server admin; NAME defaults to the slug
+SHOW APPS                                 -- apps you can access
+APP 'crm' ADD MEMBER 'alice' PRIVILEGE editor   -- PRIVILEGE defaults to reader
+APP 'crm' REMOVE MEMBER 'alice'
+APP 'crm' BIND LABEL :Lead                -- editor+; required before CREATE (:Lead) in app_crm
+APP 'crm' UNBIND LABEL :Lead              -- app admin
+SHOW APP MEMBERS 'crm'
+SHOW APP LABELS 'crm'
+DROP APP 'crm'                            -- refused while the schema holds nodes, labels or collections
+DROP APP 'crm' CASCADE                    -- detach-deletes the schema contents first`}</Code>
+
+      <H2>Working Inside an App</H2>
+      <P>
+        Pick <InlineCode>app_&lt;slug&gt;</InlineCode> in the schema dropdown (or send{" "}
+        <InlineCode>X-Anvil-App: &lt;slug&gt;</InlineCode> / <InlineCode>database: "app_&lt;slug&gt;"</InlineCode>{" "}
+        from your own client). Inside the app you only see its nodes plus{" "}
+        <InlineCode>auth</InlineCode> identity nodes; labels must be bound before use;
+        relationships may not cross into another schema except to <InlineCode>:User</InlineCode>{" "}
+        / <InlineCode>:Role</InlineCode>; and <InlineCode>app_&lt;slug&gt;.*</InlineCode>{" "}
+        collections need editor+ to write and app admin to drop.
+      </P>
+
+      <H2>Settings & Email Templates</H2>
+      <Code>{`SET SETTING 'app.crm.auth.email.smtp_from' = 'CRM <noreply@crm.example.com>'
+SET SETTING 'app.crm.server.base_url' = 'https://crm.example.com'
+RESET SETTING 'app.crm.server.base_url'`}</Code>
+      <P>
+        Scopable keys: <InlineCode>auth.require_email_verification</InlineCode>,{" "}
+        <InlineCode>auth.allow_otp_registration</InlineCode>, all{" "}
+        <InlineCode>auth.email.*</InlineCode>, <InlineCode>server.base_url</InlineCode>.
+        Anything not overridden inherits the server value. Custom{" "}
+        <InlineCode>verification</InlineCode>, <InlineCode>otp</InlineCode> and{" "}
+        <InlineCode>password_reset</InlineCode> templates (with{" "}
+        <InlineCode>{"{{app_name}}"}</InlineCode> / <InlineCode>{"{{app_slug}}"}</InlineCode>)
+        are edited with a live preview on the Apps page; auth flows use them when the
+        request carries <InlineCode>"app": "&lt;slug&gt;"</InlineCode>.
+      </P>
     </>
   );
 }
