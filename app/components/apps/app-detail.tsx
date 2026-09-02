@@ -223,6 +223,41 @@ function Overview({
         </div>
       )}
 
+      {isAppAdmin && (
+        <div className="space-y-2 border-t border-zinc-800 pt-4">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">
+            Backup
+          </p>
+          <p className="text-xs text-zinc-500">
+            Downloads a JSON snapshot of everything the app owns: members, label
+            bindings, settings overrides, email templates, collections with
+            their documents, the app-schema subgraph, sync rules, RLS policies
+            and triggers.
+          </p>
+          <button
+            disabled={busy}
+            onClick={() =>
+              run(async () => {
+                const data = await client.exportApp(app.id);
+                const blob = new Blob([JSON.stringify(data, null, 2)], {
+                  type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                const stamp = new Date().toISOString().slice(0, 10);
+                a.download = `${app.slug}-backup-${stamp}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              })
+            }
+            className="text-xs px-3 py-1 rounded bg-zinc-700 text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+          >
+            Download backup (.json)
+          </button>
+        </div>
+      )}
+
       {isServerAdmin && (
         <div className="space-y-2 border-t border-zinc-800 pt-4">
           <p className="text-[10px] text-red-400 uppercase tracking-wider">

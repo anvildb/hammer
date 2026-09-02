@@ -398,7 +398,10 @@ export class ApiClient {
 
   /** Begin a transaction and return a handle for query/commit/rollback. */
   async beginTransaction(database?: string): Promise<TransactionHandle> {
-    const { txId } = await this.post<{ txId: string }>("/db/transaction/begin", { database });
+    const { txId } = await this.post<{ txId: string }>(
+      "/db/transaction/begin",
+      { database },
+    );
 
     return {
       txId,
@@ -415,7 +418,9 @@ export class ApiClient {
   // -- GraphQL API --
 
   /** Execute a GraphQL query or mutation. */
-  async graphql<T = unknown>(request: GraphQLRequest): Promise<GraphQLResponse<T>> {
+  async graphql<T = unknown>(
+    request: GraphQLRequest,
+  ): Promise<GraphQLResponse<T>> {
     return this.post<GraphQLResponse<T>>("/graphql", {
       query: request.query,
       variables: request.variables,
@@ -443,7 +448,12 @@ export class ApiClient {
   }
 
   /** Query event log. */
-  async events(params?: { type?: string; name?: string; success?: string; limit?: number }): Promise<{ events: EventEntry[]; count: number; total: number }> {
+  async events(params?: {
+    type?: string;
+    name?: string;
+    success?: string;
+    limit?: number;
+  }): Promise<{ events: EventEntry[]; count: number; total: number }> {
     const query = new URLSearchParams();
     if (params?.type) query.set("type", params.type);
     if (params?.name) query.set("name", params.name);
@@ -454,7 +464,9 @@ export class ApiClient {
   }
 
   /** List all users. */
-  async listUsers(): Promise<Array<{ username: string; roles: string[]; must_change_password: boolean }>> {
+  async listUsers(): Promise<
+    Array<{ username: string; roles: string[]; must_change_password: boolean }>
+  > {
     return this.get("/admin/users");
   }
 
@@ -473,7 +485,10 @@ export class ApiClient {
   async listIndexSuggestions(
     dismissed?: boolean,
   ): Promise<Array<IndexSuggestion>> {
-    const qs = dismissed === undefined ? "" : `?dismissed=${dismissed ? "true" : "false"}`;
+    const qs =
+      dismissed === undefined
+        ? ""
+        : `?dismissed=${dismissed ? "true" : "false"}`;
     return this.get(`/admin/index-suggestions${qs}`);
   }
 
@@ -511,9 +526,18 @@ export class ApiClient {
 
   async updateServiceAccount(
     id: string,
-    patch: { name?: string; description?: string; roles?: string[]; disabled?: boolean },
+    patch: {
+      name?: string;
+      description?: string;
+      roles?: string[];
+      disabled?: boolean;
+    },
   ): Promise<ServiceAccount> {
-    return this.request("PATCH", `/auth/service-accounts/${encodeURIComponent(id)}`, patch);
+    return this.request(
+      "PATCH",
+      `/auth/service-accounts/${encodeURIComponent(id)}`,
+      patch,
+    );
   }
 
   async deleteServiceAccount(id: string): Promise<void> {
@@ -534,7 +558,10 @@ export class ApiClient {
     return this.get(`/apps/${encodeURIComponent(id)}`);
   }
 
-  async updateApp(id: string, patch: { name?: string; enabled?: boolean }): Promise<AppSummary> {
+  async updateApp(
+    id: string,
+    patch: { name?: string; enabled?: boolean },
+  ): Promise<AppSummary> {
     return this.request("PATCH", `/apps/${encodeURIComponent(id)}`, patch);
   }
 
@@ -546,14 +573,23 @@ export class ApiClient {
     return this.get(`/apps/${encodeURIComponent(id)}/members`);
   }
 
-  async putAppMember(id: string, user: string, privilege: AppPrivilege): Promise<AppMember> {
-    return this.put(`/apps/${encodeURIComponent(id)}/members/${encodeURIComponent(user)}`, {
-      privilege,
-    });
+  async putAppMember(
+    id: string,
+    user: string,
+    privilege: AppPrivilege,
+  ): Promise<AppMember> {
+    return this.put(
+      `/apps/${encodeURIComponent(id)}/members/${encodeURIComponent(user)}`,
+      {
+        privilege,
+      },
+    );
   }
 
   async deleteAppMember(id: string, user: string): Promise<void> {
-    await this.delete(`/apps/${encodeURIComponent(id)}/members/${encodeURIComponent(user)}`);
+    await this.delete(
+      `/apps/${encodeURIComponent(id)}/members/${encodeURIComponent(user)}`,
+    );
   }
 
   async listAppLabels(id: string): Promise<AppLabels> {
@@ -561,23 +597,33 @@ export class ApiClient {
   }
 
   async putAppLabel(id: string, label: string): Promise<AppLabels> {
-    return this.put(`/apps/${encodeURIComponent(id)}/labels/${encodeURIComponent(label)}`, {});
+    return this.put(
+      `/apps/${encodeURIComponent(id)}/labels/${encodeURIComponent(label)}`,
+      {},
+    );
   }
 
   async deleteAppLabel(id: string, label: string): Promise<AppLabels> {
-    return this.delete(`/apps/${encodeURIComponent(id)}/labels/${encodeURIComponent(label)}`);
+    return this.delete(
+      `/apps/${encodeURIComponent(id)}/labels/${encodeURIComponent(label)}`,
+    );
   }
 
   async getAppSettings(id: string): Promise<AppSettingEntry[]> {
     return this.get(`/apps/${encodeURIComponent(id)}/settings`);
   }
 
-  async putAppSettings(id: string, values: Record<string, string>): Promise<AppSettingEntry[]> {
+  async putAppSettings(
+    id: string,
+    values: Record<string, string>,
+  ): Promise<AppSettingEntry[]> {
     return this.put(`/apps/${encodeURIComponent(id)}/settings`, values);
   }
 
   async deleteAppSetting(id: string, key: string): Promise<AppSettingEntry[]> {
-    return this.delete(`/apps/${encodeURIComponent(id)}/settings/${encodeURIComponent(key)}`);
+    return this.delete(
+      `/apps/${encodeURIComponent(id)}/settings/${encodeURIComponent(key)}`,
+    );
   }
 
   async listAppEmailTemplates(id: string): Promise<AppEmailTemplate[]> {
@@ -595,21 +641,35 @@ export class ApiClient {
     );
   }
 
-  async deleteAppEmailTemplate(id: string, name: string): Promise<AppEmailTemplate> {
+  async deleteAppEmailTemplate(
+    id: string,
+    name: string,
+  ): Promise<AppEmailTemplate> {
     return this.delete(
       `/apps/${encodeURIComponent(id)}/email-templates/${encodeURIComponent(name)}`,
     );
   }
 
-  async previewAppEmailTemplate(id: string, name: string, to?: string): Promise<AppEmailPreview> {
+  async previewAppEmailTemplate(
+    id: string,
+    name: string,
+    to?: string,
+  ): Promise<AppEmailPreview> {
     return this.post(
       `/apps/${encodeURIComponent(id)}/email-templates/${encodeURIComponent(name)}/preview`,
       { to },
     );
   }
 
+  /** Full JSON backup of everything the app owns (app admin). */
+  async exportApp(id: string): Promise<unknown> {
+    return this.get(`/apps/${encodeURIComponent(id)}/export`);
+  }
+
   async listApiKeys(accountId: string): Promise<ApiKey[]> {
-    return this.get(`/auth/service-accounts/${encodeURIComponent(accountId)}/keys`);
+    return this.get(
+      `/auth/service-accounts/${encodeURIComponent(accountId)}/keys`,
+    );
   }
 
   /** Mint a new API key. The returned `secret` is the only time the plaintext
@@ -618,7 +678,10 @@ export class ApiClient {
     accountId: string,
     req: { name: string; scopes?: string[]; expires_on?: number | null },
   ): Promise<CreatedApiKey> {
-    return this.post(`/auth/service-accounts/${encodeURIComponent(accountId)}/keys`, req);
+    return this.post(
+      `/auth/service-accounts/${encodeURIComponent(accountId)}/keys`,
+      req,
+    );
   }
 
   async revokeApiKey(accountId: string, keyId: string): Promise<void> {
@@ -640,12 +703,17 @@ export class ApiClient {
   }
 
   /** Update a runtime setting (admin only). */
-  async updateSetting(key: string, value: string): Promise<{ key: string; value: string; result: string }> {
+  async updateSetting(
+    key: string,
+    value: string,
+  ): Promise<{ key: string; value: string; result: string }> {
     return this.put(`/system/settings/${encodeURIComponent(key)}`, { value });
   }
 
   /** Reset a runtime setting to default (admin only). */
-  async resetSetting(key: string): Promise<{ key: string; value: string; result: string }> {
+  async resetSetting(
+    key: string,
+  ): Promise<{ key: string; value: string; result: string }> {
     return this.delete(`/system/settings/${encodeURIComponent(key)}`);
   }
 
@@ -657,7 +725,10 @@ export class ApiClient {
   }
 
   /** Create a new document collection. */
-  async createCollection(name: string, options?: { composite_keys?: boolean; default_ttl_ms?: number }): Promise<CollectionResponse> {
+  async createCollection(
+    name: string,
+    options?: { composite_keys?: boolean; default_ttl_ms?: number },
+  ): Promise<CollectionResponse> {
     return this.post<CollectionResponse>(`/docs/${name}`, options ?? {});
   }
 
@@ -672,8 +743,16 @@ export class ApiClient {
   }
 
   /** Create or update a document. */
-  async putDocument(collection: string, id: string, body: Record<string, unknown>, options?: { ttl_ms?: number; if_not_exists?: boolean }): Promise<DocumentResponse> {
-    return this.put<DocumentResponse>(`/docs/${collection}/${id}`, { body, ...options });
+  async putDocument(
+    collection: string,
+    id: string,
+    body: Record<string, unknown>,
+    options?: { ttl_ms?: number; if_not_exists?: boolean },
+  ): Promise<DocumentResponse> {
+    return this.put<DocumentResponse>(`/docs/${collection}/${id}`, {
+      body,
+      ...options,
+    });
   }
 
   /** Delete a document. */
@@ -682,23 +761,36 @@ export class ApiClient {
   }
 
   /** Query documents in a collection. */
-  async queryDocuments(collection: string, query: DocumentQuery): Promise<DocumentQueryResponse> {
+  async queryDocuments(
+    collection: string,
+    query: DocumentQuery,
+  ): Promise<DocumentQueryResponse> {
     return this.post<DocumentQueryResponse>(`/docs/${collection}/query`, query);
   }
 
   /** Scan documents in a collection. */
-  async scanDocuments(collection: string, params?: { limit?: number; cursor?: string; projection?: string }): Promise<DocumentQueryResponse> {
+  async scanDocuments(
+    collection: string,
+    params?: { limit?: number; cursor?: string; projection?: string },
+  ): Promise<DocumentQueryResponse> {
     const searchParams = new URLSearchParams();
     if (params?.limit) searchParams.set("limit", params.limit.toString());
     if (params?.cursor) searchParams.set("cursor", params.cursor);
     if (params?.projection) searchParams.set("projection", params.projection);
     const qs = searchParams.toString();
-    return this.get<DocumentQueryResponse>(`/docs/${collection}/scan${qs ? `?${qs}` : ""}`);
+    return this.get<DocumentQueryResponse>(
+      `/docs/${collection}/scan${qs ? `?${qs}` : ""}`,
+    );
   }
 
   /** Execute a batch of document operations. */
-  async batchDocuments(collection: string, operations: BatchOperation[]): Promise<BatchResponse> {
-    return this.post<BatchResponse>(`/docs/${collection}/batch`, { operations });
+  async batchDocuments(
+    collection: string,
+    operations: BatchOperation[],
+  ): Promise<BatchResponse> {
+    return this.post<BatchResponse>(`/docs/${collection}/batch`, {
+      operations,
+    });
   }
 
   // -- Database management --
@@ -715,17 +807,24 @@ export class ApiClient {
    * policies, functions, triggers, sync rules, and indexes. Returns the
    * snapshot blob and the server-suggested filename.
    */
-  async exportDatabase(signal?: AbortSignal): Promise<{ blob: Blob; filename: string }> {
+  async exportDatabase(
+    signal?: AbortSignal,
+  ): Promise<{ blob: Blob; filename: string }> {
     const headers: Record<string, string> = {};
     if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
     const resp = await fetch(`${this.baseUrl}/db/export`, { headers, signal });
     if (!resp.ok) {
-      throw new ApiError(resp.status, resp.statusText, await resp.text().catch(() => ""));
+      throw new ApiError(
+        resp.status,
+        resp.statusText,
+        await resp.text().catch(() => ""),
+      );
     }
     const cd = resp.headers.get("content-disposition") ?? "";
     const match = cd.match(/filename="?([^"]+)"?/);
     const filename =
-      match?.[1] ?? `anvil-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.anvil`;
+      match?.[1] ??
+      `anvil-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.anvil`;
     return { blob: await resp.blob(), filename };
   }
 
@@ -736,7 +835,12 @@ export class ApiClient {
   async importDatabase(
     file: File | Blob,
     signal?: AbortSignal,
-  ): Promise<{ message: string; nodes: number; relationships: number; collections: number }> {
+  ): Promise<{
+    message: string;
+    nodes: number;
+    relationships: number;
+    collections: number;
+  }> {
     const headers: Record<string, string> = {
       "Content-Type": "application/octet-stream",
     };
@@ -748,7 +852,11 @@ export class ApiClient {
       signal,
     });
     if (!resp.ok) {
-      throw new ApiError(resp.status, resp.statusText, await resp.text().catch(() => ""));
+      throw new ApiError(
+        resp.status,
+        resp.statusText,
+        await resp.text().catch(() => ""),
+      );
     }
     return resp.json();
   }
@@ -759,14 +867,22 @@ export class ApiClient {
   }
 
   /** Get full graph data for visualization. */
-  async getGraph(database: string): Promise<{ nodes: Array<Record<string, unknown>>; edges: Array<Record<string, unknown>> }> {
+  async getGraph(
+    database: string,
+  ): Promise<{
+    nodes: Array<Record<string, unknown>>;
+    edges: Array<Record<string, unknown>>;
+  }> {
     return this.get(`/db/${encodeURIComponent(database)}/graph`);
   }
 
   // -- Auth --
 
   /** Login and store auth tokens. */
-  async login(username: string, password: string): Promise<{
+  async login(
+    username: string,
+    password: string,
+  ): Promise<{
     idToken: string;
     refreshToken: string;
     accessToken: string;
@@ -866,22 +982,43 @@ export class ApiClient {
   }
 
   /** Register a new user. */
-  async register(username: string, email: string, password: string, roles?: string[]): Promise<Record<string, unknown>> {
-    return this.post("/auth/register", { username, email, password, roles: roles ?? [] });
+  async register(
+    username: string,
+    email: string,
+    password: string,
+    roles?: string[],
+  ): Promise<Record<string, unknown>> {
+    return this.post("/auth/register", {
+      username,
+      email,
+      password,
+      roles: roles ?? [],
+    });
   }
 
   /** Change password. */
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await this.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword });
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    await this.post("/auth/change-password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
   }
 
   /** Request an OTP code to be sent to the given email. */
-  async otpRequest(email: string): Promise<{ message: string; expires_in_seconds: number }> {
+  async otpRequest(
+    email: string,
+  ): Promise<{ message: string; expires_in_seconds: number }> {
     return this.post("/auth/otp/request", { email });
   }
 
   /** Verify an OTP code and get JWT tokens. */
-  async otpVerify(email: string, code: string): Promise<{
+  async otpVerify(
+    email: string,
+    code: string,
+  ): Promise<{
     accessToken: string;
     refreshToken: string;
     idToken: string;
@@ -903,18 +1040,29 @@ export class ApiClient {
   }
 
   /** Create a new bucket. */
-  async createBucket(id: string, options: CreateBucketOptions = {}): Promise<StorageBucket> {
+  async createBucket(
+    id: string,
+    options: CreateBucketOptions = {},
+  ): Promise<StorageBucket> {
     return this.post<StorageBucket>("/storage/v1/bucket", { id, ...options });
   }
 
   /** Fetch a single bucket. */
   async getBucket(id: string): Promise<StorageBucket> {
-    return this.get<StorageBucket>(`/storage/v1/bucket/${encodeURIComponent(id)}`);
+    return this.get<StorageBucket>(
+      `/storage/v1/bucket/${encodeURIComponent(id)}`,
+    );
   }
 
   /** Update bucket settings. Pass `null` for limits to explicitly clear. */
-  async updateBucket(id: string, options: UpdateBucketOptions): Promise<StorageBucket> {
-    return this.put<StorageBucket>(`/storage/v1/bucket/${encodeURIComponent(id)}`, options);
+  async updateBucket(
+    id: string,
+    options: UpdateBucketOptions,
+  ): Promise<StorageBucket> {
+    return this.put<StorageBucket>(
+      `/storage/v1/bucket/${encodeURIComponent(id)}`,
+      options,
+    );
   }
 
   /** Delete a bucket. Must be empty first. */
@@ -929,7 +1077,10 @@ export class ApiClient {
 
   /** Revoke all signed URLs previously issued for this bucket. */
   async revokeBucketSignedUrls(id: string): Promise<void> {
-    await this.post(`/storage/v1/bucket/${encodeURIComponent(id)}/sign-revoke`, {});
+    await this.post(
+      `/storage/v1/bucket/${encodeURIComponent(id)}/sign-revoke`,
+      {},
+    );
   }
 
   /**
@@ -965,8 +1116,10 @@ export class ApiClient {
       const xhr = new XMLHttpRequest();
       xhr.open(method, url, true);
       xhr.setRequestHeader("Content-Type", contentType);
-      if (options.cacheControl) xhr.setRequestHeader("Cache-Control", options.cacheControl);
-      if (this.authToken) xhr.setRequestHeader("Authorization", `Bearer ${this.authToken}`);
+      if (options.cacheControl)
+        xhr.setRequestHeader("Cache-Control", options.cacheControl);
+      if (this.authToken)
+        xhr.setRequestHeader("Authorization", `Bearer ${this.authToken}`);
       if (options.onProgress) {
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) options.onProgress!(e.loaded, e.total);
@@ -983,7 +1136,8 @@ export class ApiClient {
           reject(new ApiError(xhr.status, xhr.statusText, xhr.responseText));
         }
       };
-      xhr.onerror = () => reject(new ApiError(0, "Network error", "upload failed"));
+      xhr.onerror = () =>
+        reject(new ApiError(0, "Network error", "upload failed"));
       xhr.onabort = () => reject(new ApiError(0, "Aborted", "upload aborted"));
       if (options.signal) {
         options.signal.addEventListener("abort", () => xhr.abort());
@@ -1018,23 +1172,32 @@ export class ApiClient {
     const metadata = encodeUploadMetadata({ bucket, path, mime });
 
     // Create session.
-    const createResp = await fetch(`${this.baseUrl}/storage/v1/upload/resumable`, {
-      method: "POST",
-      headers: this.tusHeaders({
-        "Tus-Resumable": "1.0.0",
-        "Upload-Length": String(total),
-        "Upload-Metadata": metadata,
-      }),
-      signal: options.signal,
-    });
+    const createResp = await fetch(
+      `${this.baseUrl}/storage/v1/upload/resumable`,
+      {
+        method: "POST",
+        headers: this.tusHeaders({
+          "Tus-Resumable": "1.0.0",
+          "Upload-Length": String(total),
+          "Upload-Metadata": metadata,
+        }),
+        signal: options.signal,
+      },
+    );
     if (createResp.status !== 201) {
-      throw new ApiError(createResp.status, createResp.statusText, await createResp.text());
+      throw new ApiError(
+        createResp.status,
+        createResp.statusText,
+        await createResp.text(),
+      );
     }
     const sessionUrl = createResp.headers.get("Location");
     if (!sessionUrl) {
       throw new ApiError(0, "Bad TUS response", "no Location header");
     }
-    const absSession = sessionUrl.startsWith("http") ? sessionUrl : `${this.baseUrl}${sessionUrl}`;
+    const absSession = sessionUrl.startsWith("http")
+      ? sessionUrl
+      : `${this.baseUrl}${sessionUrl}`;
 
     // Stream chunks.
     let offset = 0;
@@ -1053,14 +1216,19 @@ export class ApiClient {
         signal: options.signal,
       });
       if (!patchResp.ok) {
-        throw new ApiError(patchResp.status, patchResp.statusText, await patchResp.text());
+        throw new ApiError(
+          patchResp.status,
+          patchResp.statusText,
+          await patchResp.text(),
+        );
       }
       const newOffset = patchResp.headers.get("Upload-Offset");
       if (!newOffset) {
         throw new ApiError(0, "Bad TUS response", "no Upload-Offset header");
       }
       offset = Number.parseInt(newOffset, 10);
-      contentHash = patchResp.headers.get("X-Anvil-Content-Hash") ?? contentHash;
+      contentHash =
+        patchResp.headers.get("X-Anvil-Content-Hash") ?? contentHash;
       options.onProgress?.(offset, total);
     }
     return { contentHash, size: total, sessionUrl: absSession };
@@ -1074,7 +1242,11 @@ export class ApiClient {
   }
 
   /** Download an object's bytes. */
-  async downloadObject(bucket: string, path: string, signal?: AbortSignal): Promise<Blob> {
+  async downloadObject(
+    bucket: string,
+    path: string,
+    signal?: AbortSignal,
+  ): Promise<Blob> {
     const url = `${this.baseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodePathSegments(path)}`;
     const headers: Record<string, string> = {};
     if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
@@ -1103,14 +1275,23 @@ export class ApiClient {
       : `/storage/v1/object/public/${encoded}`;
     const query: string[] = [];
     if (options.transform) {
-      if (options.transform.width !== undefined) query.push(`width=${options.transform.width}`);
-      if (options.transform.height !== undefined) query.push(`height=${options.transform.height}`);
-      if (options.transform.resize) query.push(`resize=${encodeURIComponent(options.transform.resize)}`);
-      if (options.transform.format) query.push(`format=${encodeURIComponent(options.transform.format)}`);
-      if (options.transform.quality !== undefined) query.push(`quality=${options.transform.quality}`);
+      if (options.transform.width !== undefined)
+        query.push(`width=${options.transform.width}`);
+      if (options.transform.height !== undefined)
+        query.push(`height=${options.transform.height}`);
+      if (options.transform.resize)
+        query.push(`resize=${encodeURIComponent(options.transform.resize)}`);
+      if (options.transform.format)
+        query.push(`format=${encodeURIComponent(options.transform.format)}`);
+      if (options.transform.quality !== undefined)
+        query.push(`quality=${options.transform.quality}`);
     }
     if (options.download) {
-      query.push(typeof options.download === "string" ? `download=${encodeURIComponent(options.download)}` : "download");
+      query.push(
+        typeof options.download === "string"
+          ? `download=${encodeURIComponent(options.download)}`
+          : "download",
+      );
     }
     return `${this.baseUrl}${route}${query.length ? `?${query.join("&")}` : ""}`;
   }
@@ -1133,8 +1314,14 @@ export class ApiClient {
   }
 
   /** List objects in a bucket with pagination and sorting. */
-  async listObjects(bucket: string, options: ListObjectsOptions = {}): Promise<ListObjectsResponse> {
-    return this.post<ListObjectsResponse>(`/storage/v1/object/list/${encodeURIComponent(bucket)}`, options);
+  async listObjects(
+    bucket: string,
+    options: ListObjectsOptions = {},
+  ): Promise<ListObjectsResponse> {
+    return this.post<ListObjectsResponse>(
+      `/storage/v1/object/list/${encodeURIComponent(bucket)}`,
+      options,
+    );
   }
 
   /** Move (rename) an object within or between buckets. */
@@ -1190,7 +1377,11 @@ export class ApiClient {
     return this.request<T>("DELETE", path);
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -1228,7 +1419,12 @@ export class ApiClient {
 
       if (!response.ok) {
         // On 401, attempt to refresh the token and retry once.
-        if (response.status === 401 && this.refreshToken && path !== "/auth/refresh" && path !== "/auth/login") {
+        if (
+          response.status === 401 &&
+          this.refreshToken &&
+          path !== "/auth/refresh" &&
+          path !== "/auth/login"
+        ) {
           const refreshed = await this.tryRefresh();
           if (refreshed) {
             // Retry the original request with the new token.
@@ -1247,14 +1443,21 @@ export class ApiClient {
         throw new ApiError(response.status, response.statusText, text);
       }
 
-      if (response.status === 204 || response.headers.get("content-length") === "0") {
+      if (
+        response.status === 204 ||
+        response.headers.get("content-length") === "0"
+      ) {
         return undefined as T;
       }
       return (await response.json()) as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof DOMException && error.name === "AbortError") {
-        throw new ApiError(0, "Request timeout", `Request to ${path} timed out after ${this.timeout}ms`);
+        throw new ApiError(
+          0,
+          "Request timeout",
+          `Request to ${path} timed out after ${this.timeout}ms`,
+        );
       }
       throw new ApiError(0, "Network error", String(error));
     } finally {
@@ -1377,13 +1580,22 @@ export function formatBytes(n: number | undefined | null): string {
 
 /** Parse a size hint string (e.g. `"5MB"`, `"1GiB"`) into bytes. */
 export function parseSizeHint(value: string): number | null {
-  const m = value.trim().match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|KIB|MIB|GIB|TIB)?$/i);
+  const m = value
+    .trim()
+    .match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB|KIB|MIB|GIB|TIB)?$/i);
   if (!m) return null;
   const n = Number.parseFloat(m[1]);
   const unit = (m[2] ?? "B").toUpperCase();
   const mult: Record<string, number> = {
-    B: 1, KB: 1_000, MB: 1_000_000, GB: 1_000_000_000, TB: 1_000_000_000_000,
-    KIB: 1024, MIB: 1024 ** 2, GIB: 1024 ** 3, TIB: 1024 ** 4,
+    B: 1,
+    KB: 1_000,
+    MB: 1_000_000,
+    GB: 1_000_000_000,
+    TB: 1_000_000_000_000,
+    KIB: 1024,
+    MIB: 1024 ** 2,
+    GIB: 1024 ** 3,
+    TIB: 1024 ** 4,
   };
   const m2 = mult[unit];
   if (m2 === undefined) return null;
