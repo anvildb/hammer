@@ -666,6 +666,15 @@ export class ApiClient {
     return this.get(`/apps/${encodeURIComponent(id)}/export`);
   }
 
+  /** Restore an app from a backup bundle (server admin). Creates a NEW app. */
+  async importApp(
+    backup: unknown,
+    slug?: string,
+  ): Promise<{ app: AppSummary; imported: Record<string, unknown> }> {
+    const qs = slug ? `?slug=${encodeURIComponent(slug)}` : "";
+    return this.post(`/apps/import${qs}`, backup);
+  }
+
   async listApiKeys(accountId: string): Promise<ApiKey[]> {
     return this.get(
       `/auth/service-accounts/${encodeURIComponent(accountId)}/keys`,
@@ -867,9 +876,7 @@ export class ApiClient {
   }
 
   /** Get full graph data for visualization. */
-  async getGraph(
-    database: string,
-  ): Promise<{
+  async getGraph(database: string): Promise<{
     nodes: Array<Record<string, unknown>>;
     edges: Array<Record<string, unknown>>;
   }> {

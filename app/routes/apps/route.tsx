@@ -18,6 +18,36 @@ export default function AppsRoute() {
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importSlug, setImportSlug] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+
+  async function importBackup(file: File) {
+    setImporting(true);
+    setError(null);
+    setImportSummary(null);
+    try {
+      const backup = JSON.parse(await file.text());
+      const res = await client.importApp(
+        backup,
+        importSlug.trim() || undefined,
+      );
+      setShowImport(false);
+      setImportSlug("");
+      await refreshApps();
+      setSelectedId(res.app.id);
+      const counts = Object.entries(res.imported)
+        .filter(([, v]) => typeof v === "number" && (v as number) > 0)
+        .map(([k, v]) => `${v} ${k.replaceAll("_", " ")}`)
+        .join(", ");
+      setImportSummary(`Imported '${res.app.slug}': ${counts || "empty app"}`);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   const selected = apps.find((a) => a.id === selectedId) ?? null;
 
@@ -62,12 +92,26 @@ export default function AppsRoute() {
             </span>
           </h3>
           {isAdmin && (
-            <button
-              onClick={() => setShowCreate(!showCreate)}
-              className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
-            >
-              {showCreate ? "Cancel" : "+ Create"}
-            </button>
+            <div className="flex gap-1">
+              <button
+                onClick={() => {
+                  setShowImport(!showImport);
+                  setShowCreate(false);
+                }}
+                className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+              >
+                {showImport ? "Cancel" : "Import"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreate(!showCreate);
+                  setShowImport(false);
+                }}
+                className="text-[11px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700"
+              >
+                {showCreate ? "Cancel" : "+ Create"}
+              </button>
+            </div>
           )}
         </div>
 
@@ -117,6 +161,48 @@ export default function AppsRoute() {
               {creating ? "Creating..." : "Create app"}
             </button>
           </form>
+        )}
+
+        {showImport && (
+          <div className="px-3 py-2 border-b border-zinc-800 space-y-2">
+            <p className="text-[10px] text-zinc-500">
+              Restore a <span className="font-mono">*-backup.json</span> file as
+              a new app. Leave the slug empty to keep the backup's slug.
+            </p>
+            <input
+              value={importSlug}
+              onChange={(e) => setImportSlug(e.target.value)}
+              placeholder="new slug (optional)"
+              pattern="[a-z][a-z0-9_]{1,31}"
+              className="w-full bg-zinc-800 text-zinc-200 text-xs font-mono rounded px-2 py-1 border border-zinc-700 focus:border-zinc-500 focus:outline-none"
+            />
+            <label className="block">
+              <span
+                className={`inline-block w-full text-center text-xs px-2 py-1 rounded bg-zinc-700 text-zinc-100 hover:bg-zinc-600 cursor-pointer ${
+                  importing ? "opacity-50 pointer-events-none" : ""
+                }`}
+              >
+                {importing ? "Importing..." : "Choose backup file..."}
+              </span>
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                disabled={importing}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) importBackup(f);
+                }}
+              />
+            </label>
+          </div>
+        )}
+
+        {importSummary && (
+          <div className="mx-3 mt-2 p-2 rounded bg-emerald-900/20 border border-emerald-900/40 text-emerald-400 text-xs break-words">
+            {importSummary}
+          </div>
         )}
 
         {error && (
