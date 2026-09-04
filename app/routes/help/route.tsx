@@ -1386,7 +1386,13 @@ SHOW POLICIES ON :Label
 ENABLE ROW LEVEL SECURITY ON :Label
 DISABLE ROW LEVEL SECURITY ON :Label
 FORCE ROW LEVEL SECURITY ON :Label
-SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
+SIMULATE POLICY AS alice WITH ROLE reader ON :Project
+
+-- Column-level security: hide properties from roles
+HIDE PROPERTY email ON :User FROM reader
+HIDE PROPERTY salary, ssn ON :Employee          -- no FROM = every non-admin role
+UNHIDE PROPERTY email ON :User FROM reader
+SHOW HIDDEN PROPERTIES`}</Code>
 
       <H2>Session Functions</H2>
       <Table
