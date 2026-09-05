@@ -11,7 +11,7 @@ interface Props {
 }
 
 const VARIABLES: Record<string, string[]> = {
-  verification: ["{{verification_link}}", "{{token}}"],
+  verification: ["{{verification_link}}", "{{verification_code}}", "{{token}}"],
   otp: ["{{otp_code}}", "{{ttl_minutes}}"],
   password_reset: ["{{reset_link}}", "{{token}}"],
 };
