@@ -27,7 +27,9 @@ export function Sidebar({ favorites }: SidebarProps) {
   const location = useLocation();
   const { selectedSchema, setSelectedSchema, isAdmin, apps } = useConnection();
 
-  const baseSchemas: string[] = isAdmin ? [...SCHEMAS] : SCHEMAS.filter((s) => s !== "auth");
+  const baseSchemas: string[] = isAdmin
+    ? [...SCHEMAS]
+    : SCHEMAS.filter((s) => s !== "auth" && s !== "system");
   const visibleSchemas: { value: string; label: string }[] = [
     ...baseSchemas.map((s) => ({ value: s, label: s })),
     ...apps.map((a) => ({ value: appSchemaName(a.slug), label: `${appSchemaName(a.slug)} — ${a.name}` })),

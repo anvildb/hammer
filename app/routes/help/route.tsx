@@ -2779,9 +2779,8 @@ function HammerSection() {
       <P>
         Switch between <InlineCode>public</InlineCode>, <InlineCode>auth</InlineCode>, and{" "}
         <InlineCode>system</InlineCode> schemas in the sidebar. Schema-aware pages filter
-        content by the selected schema. The <InlineCode>auth</InlineCode> schema is only
-        visible to admin users; <InlineCode>storage</InlineCode> collections are owned by
-        the storage subsystem and managed through the Storage page.
+        content by the selected schema. The <InlineCode>auth</InlineCode> and{" "}
+        <InlineCode>system</InlineCode> schemas are only visible to admin users.
       </P>
 
       <H2>Graph Visualization</H2>
