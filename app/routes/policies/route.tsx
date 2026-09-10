@@ -68,12 +68,94 @@ export default function PoliciesRoute() {
   const [simError, setSimError] = useState<string | null>(null);
   const [simulating, setSimulating] = useState(false);
 
-  const AUTH_TARGETS = ["User", "Role", "auth.users", "auth.roles", "auth.user_roles", "auth.refresh_tokens"];
+  const AUTH_TARGETS = [
+    "User",
+    "Role",
+    "auth.users",
+    "auth.roles",
+    "auth.user_roles",
+    "auth.refresh_tokens",
+  ];
 
   const isAuthPolicy = (p: Policy) => {
     const t = p.target.replace(/^[:]/, "").replace(/^COLLECTION /, "");
     return AUTH_TARGETS.some((a) => t === a);
   };
+
+  // RLS property masks (HIDE PROPERTY …) — separate from policies.
+  interface Mask {
+    id: string;
+    target: string;
+    property: string;
+    hiddenFrom: string;
+  }
+  const [masks, setMasks] = useState<Mask[]>([]);
+  const [maskError, setMaskError] = useState<string | null>(null);
+  const [maskProp, setMaskProp] = useState("");
+  const [maskTarget, setMaskTarget] = useState("");
+  const [maskRoles, setMaskRoles] = useState("");
+  const [hiding, setHiding] = useState(false);
+
+  const fetchMasks = useCallback(async () => {
+    if (status !== "connected") return;
+    try {
+      const res = await client.cypher({ query: "SHOW HIDDEN PROPERTIES" });
+      setMasks(
+        res.rows.map((row) => ({
+          id: formatCell(row[0]),
+          target: formatCell(row[1]),
+          property: formatCell(row[2]),
+          hiddenFrom: formatCell(row[3]),
+        })),
+      );
+      setMaskError(null);
+    } catch (e) {
+      setMaskError(String(e));
+    }
+  }, [client, status]);
+
+  useEffect(() => {
+    fetchMasks();
+  }, [fetchMasks]);
+
+  async function handleHide(e: React.FormEvent) {
+    e.preventDefault();
+    if (status !== "connected") return;
+    setHiding(true);
+    try {
+      const target = maskTarget.includes(".")
+        ? `COLLECTION ${maskTarget}`
+        : maskTarget.startsWith(":")
+          ? maskTarget
+          : `:${maskTarget}`;
+      let query = `HIDE PROPERTY ${maskProp.trim()} ON ${target}`;
+      const roles = maskRoles
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean);
+      if (roles.length > 0) query += ` FROM ${roles.join(", ")}`;
+      await client.cypher({ query });
+      setMaskProp("");
+      setMaskTarget("");
+      setMaskRoles("");
+      await fetchMasks();
+    } catch (e) {
+      setMaskError(String(e));
+    } finally {
+      setHiding(false);
+    }
+  }
+
+  async function handleUnhide(m: Mask) {
+    try {
+      await client.cypher({
+        query: `UNHIDE PROPERTY ${m.property} ON ${m.target}`,
+      });
+      await fetchMasks();
+    } catch (e) {
+      setMaskError(String(e));
+    }
+  }
 
   const fetchPolicies = useCallback(async () => {
     if (status !== "connected") return;
@@ -82,7 +164,9 @@ export default function PoliciesRoute() {
       const res = await client.cypher({ query: "SHOW POLICIES" });
       const all = parsePolicies(res);
       setPolicies(
-        all.filter((p) => (selectedSchema === "auth" ? isAuthPolicy(p) : !isAuthPolicy(p)))
+        all.filter((p) =>
+          selectedSchema === "auth" ? isAuthPolicy(p) : !isAuthPolicy(p),
+        ),
       );
       setError(null);
     } catch (e) {
@@ -202,22 +286,34 @@ export default function PoliciesRoute() {
             </div>
           )}
           {!loading && !error && policies.length === 0 && (
-            <p className="text-sm text-zinc-500">
-              No policies defined yet.
-            </p>
+            <p className="text-sm text-zinc-500">No policies defined yet.</p>
           )}
           {!loading && policies.length > 0 && (
             <div className="overflow-x-auto rounded-md border border-zinc-800">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-zinc-900 border-b border-zinc-800">
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Name</th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Target</th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Operation</th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Role</th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Mode</th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Using</th>
-                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">Check</th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Name
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Target
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Operation
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Role
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Mode
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Using
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Check
+                    </th>
                     <th className="px-3 py-2 w-20"></th>
                   </tr>
                 </thead>
@@ -228,7 +324,9 @@ export default function PoliciesRoute() {
                       className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
                     >
                       <td className="px-3 py-2 font-mono text-xs">{p.name}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{p.target}</td>
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {p.target}
+                      </td>
                       <td className="px-3 py-2 text-xs">{p.operation}</td>
                       <td className="px-3 py-2 text-xs">{p.role}</td>
                       <td className="px-3 py-2 text-xs">
@@ -242,10 +340,16 @@ export default function PoliciesRoute() {
                           {p.mode}
                         </span>
                       </td>
-                      <td className="px-3 py-2 font-mono text-xs max-w-48 truncate" title={p.using}>
+                      <td
+                        className="px-3 py-2 font-mono text-xs max-w-48 truncate"
+                        title={p.using}
+                      >
                         {p.using}
                       </td>
-                      <td className="px-3 py-2 font-mono text-xs max-w-48 truncate" title={p.check}>
+                      <td
+                        className="px-3 py-2 font-mono text-xs max-w-48 truncate"
+                        title={p.check}
+                      >
                         {p.check || "--"}
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -264,6 +368,119 @@ export default function PoliciesRoute() {
           )}
         </section>
 
+        {/* Property masks (column-level security) */}
+        <section>
+          <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3">
+            Hidden Properties
+          </h2>
+          <p className="text-sm text-zinc-500 mb-3">
+            Column-level security: masked properties are removed from read
+            results for the listed roles (admins always see everything). Masks
+            follow sync pairs, so <span className="font-mono">:User</span> also
+            covers <span className="font-mono">auth.users</span>. These are
+            separate from row policies and are listed here for every schema.
+          </p>
+          {maskError && (
+            <div className="bg-red-900/30 border border-red-800 rounded-md p-3 text-red-300 text-sm mb-3">
+              {maskError}
+            </div>
+          )}
+          {masks.length === 0 ? (
+            <p className="text-sm text-zinc-500">No hidden properties.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-zinc-800">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-zinc-900 border-b border-zinc-800">
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Target
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Property
+                    </th>
+                    <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                      Hidden From
+                    </th>
+                    <th className="px-3 py-2 w-20"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {masks.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
+                    >
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {m.target}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {m.property}
+                      </td>
+                      <td className="px-3 py-2 text-xs">{m.hiddenFrom}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          onClick={() => handleUnhide(m)}
+                          className="px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors"
+                        >
+                          Unhide
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <form
+            onSubmit={handleHide}
+            className="mt-3 flex flex-wrap items-end gap-2"
+          >
+            <div>
+              <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-0.5">
+                Property
+              </label>
+              <input
+                value={maskProp}
+                onChange={(e) => setMaskProp(e.target.value)}
+                placeholder="email"
+                required
+                className="bg-zinc-800 text-zinc-200 text-xs font-mono rounded px-2 py-1 border border-zinc-700 focus:border-zinc-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-0.5">
+                Target (label or collection)
+              </label>
+              <input
+                value={maskTarget}
+                onChange={(e) => setMaskTarget(e.target.value)}
+                placeholder=":User or app_x.leads"
+                required
+                className="bg-zinc-800 text-zinc-200 text-xs font-mono rounded px-2 py-1 border border-zinc-700 focus:border-zinc-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-0.5">
+                Roles (comma-sep, empty = all non-admin)
+              </label>
+              <input
+                value={maskRoles}
+                onChange={(e) => setMaskRoles(e.target.value)}
+                placeholder="reader"
+                className="bg-zinc-800 text-zinc-200 text-xs font-mono rounded px-2 py-1 border border-zinc-700 focus:border-zinc-500 focus:outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={hiding}
+              className="text-xs px-3 py-1 rounded bg-zinc-700 text-zinc-100 hover:bg-zinc-600 disabled:opacity-50"
+            >
+              {hiding ? "Hiding..." : "Hide property"}
+            </button>
+          </form>
+        </section>
+
         {/* Create policy form */}
         <section>
           <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3">
@@ -274,10 +491,15 @@ export default function PoliciesRoute() {
               {createError}
             </div>
           )}
-          <form onSubmit={handleCreate} className="bg-zinc-900 border border-zinc-800 rounded-md p-4 space-y-4">
+          <form
+            onSubmit={handleCreate}
+            className="bg-zinc-900 border border-zinc-800 rounded-md p-4 space-y-4"
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Policy Name</label>
+                <label className="block text-xs text-zinc-400 mb-1">
+                  Policy Name
+                </label>
                 <input
                   type="text"
                   value={formName}
@@ -288,7 +510,9 @@ export default function PoliciesRoute() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Target Label</label>
+                <label className="block text-xs text-zinc-400 mb-1">
+                  Target Label
+                </label>
                 <input
                   type="text"
                   value={formTarget}
@@ -299,7 +523,9 @@ export default function PoliciesRoute() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Operation</label>
+                <label className="block text-xs text-zinc-400 mb-1">
+                  Operation
+                </label>
                 <select
                   value={formOperation}
                   onChange={(e) => setFormOperation(e.target.value)}
@@ -336,7 +562,9 @@ export default function PoliciesRoute() {
               </div>
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">USING Predicate</label>
+              <label className="block text-xs text-zinc-400 mb-1">
+                USING Predicate
+              </label>
               <input
                 type="text"
                 value={formUsing}
@@ -348,7 +576,10 @@ export default function PoliciesRoute() {
             </div>
             <div>
               <label className="block text-xs text-zinc-400 mb-1">
-                CHECK Predicate <span className="text-zinc-600">(optional, for INSERT/UPDATE)</span>
+                CHECK Predicate{" "}
+                <span className="text-zinc-600">
+                  (optional, for INSERT/UPDATE)
+                </span>
               </label>
               <input
                 type="text"
@@ -388,7 +619,9 @@ export default function PoliciesRoute() {
             )}
             <div className="flex items-end gap-3">
               <div className="flex-1 max-w-xs">
-                <label className="block text-xs text-zinc-400 mb-1">Label</label>
+                <label className="block text-xs text-zinc-400 mb-1">
+                  Label
+                </label>
                 <input
                   type="text"
                   value={rlsLabel}
@@ -443,7 +676,9 @@ export default function PoliciesRoute() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Target Label</label>
+                <label className="block text-xs text-zinc-400 mb-1">
+                  Target Label
+                </label>
                 <input
                   type="text"
                   value={simTarget}
@@ -456,7 +691,13 @@ export default function PoliciesRoute() {
             <div>
               <button
                 onClick={handleSimulate}
-                disabled={simulating || !simUser.trim() || !simRole.trim() || !simTarget.trim() || status !== "connected"}
+                disabled={
+                  simulating ||
+                  !simUser.trim() ||
+                  !simRole.trim() ||
+                  !simTarget.trim() ||
+                  status !== "connected"
+                }
                 className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium rounded-md transition-colors"
               >
                 {simulating ? "Simulating..." : "Run Simulation"}
@@ -500,7 +741,8 @@ export default function PoliciesRoute() {
                   </tbody>
                 </table>
                 <p className="text-xs text-zinc-500 mt-2">
-                  {simResult.rowCount} row{simResult.rowCount !== 1 ? "s" : ""} returned
+                  {simResult.rowCount} row{simResult.rowCount !== 1 ? "s" : ""}{" "}
+                  returned
                 </p>
               </div>
             )}
