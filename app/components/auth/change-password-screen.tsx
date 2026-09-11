@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { canAutoFocus } from "~/lib/utils";
 import { useConnection } from "~/lib/connection-context";
 
 export function ChangePasswordScreen() {
-  const { client, currentUser, clearMustChangePassword, logout } = useConnection();
+  const { client, currentUser, clearMustChangePassword, logout } =
+    useConnection();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -45,13 +47,20 @@ export function ChangePasswordScreen() {
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-zinc-100">Change Password</h1>
           <p className="text-zinc-500 text-sm mt-1">
-            Welcome, {currentUser}. You must change your password before continuing.
+            Welcome, {currentUser}. You must change your password before
+            continuing.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 space-y-4"
+        >
           <div>
-            <label htmlFor="current" className="block text-xs text-zinc-400 mb-1">
+            <label
+              htmlFor="current"
+              className="block text-xs text-zinc-400 mb-1"
+            >
               Current Password
             </label>
             <input
@@ -59,7 +68,7 @@ export function ChangePasswordScreen() {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              autoFocus
+              autoFocus={canAutoFocus()}
               autoComplete="current-password"
               className="w-full bg-zinc-950 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
             />
@@ -80,7 +89,10 @@ export function ChangePasswordScreen() {
           </div>
 
           <div>
-            <label htmlFor="confirm" className="block text-xs text-zinc-400 mb-1">
+            <label
+              htmlFor="confirm"
+              className="block text-xs text-zinc-400 mb-1"
+            >
               Confirm New Password
             </label>
             <input
@@ -93,13 +105,13 @@ export function ChangePasswordScreen() {
             />
           </div>
 
-          {error && (
-            <p className="text-red-400 text-xs">{error}</p>
-          )}
+          {error && <p className="text-red-400 text-xs">{error}</p>}
 
           <button
             type="submit"
-            disabled={loading || !currentPassword || !newPassword || !confirmPassword}
+            disabled={
+              loading || !currentPassword || !newPassword || !confirmPassword
+            }
             className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium rounded transition-colors"
           >
             {loading ? "Changing..." : "Change Password"}

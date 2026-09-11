@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { canAutoFocus } from "~/lib/utils";
 import type { ApiClient, AppSettingEntry } from "~/lib/api-client";
 
 interface Props {
@@ -108,7 +109,7 @@ export function AppSettings({ client, appId }: Props) {
                   <td className="px-3 py-2 font-mono text-xs text-zinc-300">
                     {editing === e.key ? (
                       <input
-                        autoFocus
+                        autoFocus={canAutoFocus()}
                         value={draft}
                         onChange={(ev) => setDraft(ev.target.value)}
                         onKeyDown={(ev) => {

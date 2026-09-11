@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { canAutoFocus } from "~/lib/utils";
 import { useConnection } from "~/lib/connection-context";
 import type { RuntimeSetting } from "~/lib/api-client";
 
@@ -48,11 +49,16 @@ export function ServerSettings() {
           updated_by: "",
         };
         const at = list.findIndex((s) => s.category === "server");
-        list = at === -1 ? [...list, synthetic] : [...list.slice(0, at), synthetic, ...list.slice(at)];
+        list =
+          at === -1
+            ? [...list, synthetic]
+            : [...list.slice(0, at), synthetic, ...list.slice(at)];
       }
       // Editable settings first within the section, so the rows with an Edit
       // button aren't buried under read-only (restart) ones.
-      list = [...list].sort((a, b) => Number(a.read_only) - Number(b.read_only));
+      list = [...list].sort(
+        (a, b) => Number(a.read_only) - Number(b.read_only),
+      );
       setSettings(list);
     } catch (err) {
       setError(String(err));
@@ -110,7 +116,7 @@ export function ServerSettings() {
     (s) =>
       !filter ||
       s.key.toLowerCase().includes(filter.toLowerCase()) ||
-      s.description.toLowerCase().includes(filter.toLowerCase())
+      s.description.toLowerCase().includes(filter.toLowerCase()),
   );
 
   const grouped = CATEGORIES.map((cat) => ({
@@ -188,7 +194,7 @@ export function ServerSettings() {
                               if (e.key === "Enter") handleSave(setting.key);
                               if (e.key === "Escape") setEditingKey(null);
                             }}
-                            autoFocus
+                            autoFocus={canAutoFocus()}
                             className="bg-zinc-950 border border-blue-600 rounded px-2 py-0.5 text-xs text-zinc-100 font-mono w-40 focus:outline-none"
                           />
                         )}
@@ -209,8 +215,11 @@ export function ServerSettings() {
                     ) : (
                       <>
                         <code className="text-xs text-zinc-300 font-mono bg-zinc-800 px-2 py-0.5 rounded max-w-[200px] truncate">
-                          {setting.type === "string" && setting.key.includes("pass")
-                            ? setting.value ? "***" : ""
+                          {setting.type === "string" &&
+                          setting.key.includes("pass")
+                            ? setting.value
+                              ? "***"
+                              : ""
                             : setting.value || "\u00A0"}
                         </code>
                         {!setting.read_only && (

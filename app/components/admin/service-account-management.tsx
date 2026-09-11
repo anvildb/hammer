@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import type { ApiClient, ServiceAccount, ApiKey, CreatedApiKey } from "~/lib/api-client";
+import { canAutoFocus } from "~/lib/utils";
+import type {
+  ApiClient,
+  ServiceAccount,
+  ApiKey,
+  CreatedApiKey,
+} from "~/lib/api-client";
 
 interface Props {
   client: ApiClient;
@@ -78,7 +84,8 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
           )}
           {!loading && accounts.length === 0 && (
             <p className="px-3 py-6 text-xs text-zinc-500 text-center">
-              No service accounts yet. Click <span className="font-mono">+ Create</span> to add one.
+              No service accounts yet. Click{" "}
+              <span className="font-mono">+ Create</span> to add one.
             </p>
           )}
           {accounts.map((acc) => (
@@ -86,13 +93,13 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
               key={acc.id}
               onClick={() => setSelectedId(acc.id)}
               className={`block w-full text-left px-3 py-2 transition-colors ${
-                selectedId === acc.id
-                  ? "bg-zinc-800"
-                  : "hover:bg-zinc-800/40"
+                selectedId === acc.id ? "bg-zinc-800" : "hover:bg-zinc-800/40"
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-zinc-200 truncate">{acc.name}</span>
+                <span className="text-xs font-mono text-zinc-200 truncate">
+                  {acc.name}
+                </span>
                 {acc.disabled && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-400 shrink-0">
                     disabled
@@ -106,18 +113,27 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
               </div>
               <div className="flex flex-wrap gap-1 mt-1">
                 {acc.roles.length === 0 && (
-                  <span className="text-[10px] text-zinc-600 italic">no roles</span>
+                  <span className="text-[10px] text-zinc-600 italic">
+                    no roles
+                  </span>
                 )}
                 {acc.roles.map((r) => (
-                  <span key={r} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                  <span
+                    key={r}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400"
+                  >
                     {r}
                   </span>
                 ))}
               </div>
               {acc.description && (
-                <p className="mt-1 text-[10px] text-zinc-500 truncate">{acc.description}</p>
+                <p className="mt-1 text-[10px] text-zinc-500 truncate">
+                  {acc.description}
+                </p>
               )}
-              <p className="mt-0.5 text-[10px] text-zinc-600 font-mono truncate">{acc.id}</p>
+              <p className="mt-0.5 text-[10px] text-zinc-600 font-mono truncate">
+                {acc.id}
+              </p>
             </button>
           ))}
         </div>
@@ -172,7 +188,7 @@ function CreateAccountForm({
   return (
     <div className="px-3 py-3 border-b border-zinc-800 bg-zinc-900/50 space-y-2">
       <input
-        autoFocus
+        autoFocus={canAutoFocus()}
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -195,7 +211,9 @@ function CreateAccountForm({
               <button
                 key={r}
                 onClick={() =>
-                  setRoles((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))
+                  setRoles((prev) =>
+                    on ? prev.filter((x) => x !== r) : [...prev, r],
+                  )
                 }
                 className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                   on
@@ -268,14 +286,22 @@ function AccountDetail({
     setEditRoles(account.roles);
     setEditDisabled(account.disabled);
     setError(null);
-  }, [account.id, account.name, account.description, account.disabled, account.roles]);
+  }, [
+    account.id,
+    account.name,
+    account.description,
+    account.disabled,
+    account.roles,
+  ]);
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <h2 className="text-lg font-semibold text-zinc-100 font-mono">{account.name}</h2>
+          <h2 className="text-lg font-semibold text-zinc-100 font-mono">
+            {account.name}
+          </h2>
           {account.service_role && (
             <span className="text-[11px] px-2 py-0.5 rounded bg-amber-900/30 text-amber-400">
               service_role
@@ -292,8 +318,8 @@ function AccountDetail({
           <p className="mt-2 text-sm text-zinc-400">{account.description}</p>
         )}
         <p className="mt-2 text-[11px] text-zinc-600">
-          Created by <span className="text-zinc-400">{account.created_by}</span> on{" "}
-          {new Date(account.created_on).toLocaleString()}
+          Created by <span className="text-zinc-400">{account.created_by}</span>{" "}
+          on {new Date(account.created_on).toLocaleString()}
         </p>
       </div>
 
@@ -382,14 +408,23 @@ function AccountDetail({
                 setError(null);
                 try {
                   await client.updateServiceAccount(account.id, {
-                    name: editName.trim() !== account.name ? editName.trim() : undefined,
+                    name:
+                      editName.trim() !== account.name
+                        ? editName.trim()
+                        : undefined,
                     description:
-                      editDescription !== account.description ? editDescription : undefined,
+                      editDescription !== account.description
+                        ? editDescription
+                        : undefined,
                     roles:
-                      JSON.stringify(editRoles) !== JSON.stringify(account.roles)
+                      JSON.stringify(editRoles) !==
+                      JSON.stringify(account.roles)
                         ? editRoles
                         : undefined,
-                    disabled: editDisabled !== account.disabled ? editDisabled : undefined,
+                    disabled:
+                      editDisabled !== account.disabled
+                        ? editDisabled
+                        : undefined,
                   });
                   setEditing(false);
                   await onChanged();
@@ -426,7 +461,13 @@ function AccountDetail({
 // API keys subpanel
 // ---------------------------------------------------------------------------
 
-function ApiKeysPanel({ client, account }: { client: ApiClient; account: ServiceAccount }) {
+function ApiKeysPanel({
+  client,
+  account,
+}: {
+  client: ApiClient;
+  account: ServiceAccount;
+}) {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -488,7 +529,10 @@ function ApiKeysPanel({ client, account }: { client: ApiClient; account: Service
       )}
 
       {justCreated && (
-        <NewKeyDisplay created={justCreated} onDismiss={() => setJustCreated(null)} />
+        <NewKeyDisplay
+          created={justCreated}
+          onDismiss={() => setJustCreated(null)}
+        />
       )}
 
       {error && (
@@ -499,7 +543,8 @@ function ApiKeysPanel({ client, account }: { client: ApiClient; account: Service
 
       {keys.length === 0 && !loading && (
         <p className="text-xs text-zinc-500 italic">
-          No API keys for this account. Click <span className="font-mono">+ Create Key</span>.
+          No API keys for this account. Click{" "}
+          <span className="font-mono">+ Create Key</span>.
         </p>
       )}
 
@@ -508,21 +553,40 @@ function ApiKeysPanel({ client, account }: { client: ApiClient; account: Service
           <table className="w-full text-xs">
             <thead className="bg-zinc-900">
               <tr className="border-b border-zinc-800">
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Name</th>
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Prefix</th>
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Scopes</th>
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Created</th>
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Last used</th>
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Expires</th>
-                <th className="text-left px-3 py-2 text-zinc-400 font-medium">Status</th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Name
+                </th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Prefix
+                </th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Scopes
+                </th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Created
+                </th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Last used
+                </th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Expires
+                </th>
+                <th className="text-left px-3 py-2 text-zinc-400 font-medium">
+                  Status
+                </th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {keys.map((k) => (
-                <tr key={k.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/50">
+                <tr
+                  key={k.id}
+                  className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
+                >
                   <td className="px-3 py-1.5 text-zinc-200">{k.name}</td>
-                  <td className="px-3 py-1.5 text-zinc-400 font-mono">{k.prefix}…</td>
+                  <td className="px-3 py-1.5 text-zinc-400 font-mono">
+                    {k.prefix}…
+                  </td>
                   <td className="px-3 py-1.5 text-zinc-400">
                     {k.scopes.length === 0 ? (
                       <span className="text-zinc-600 italic">all roles</span>
@@ -534,10 +598,14 @@ function ApiKeysPanel({ client, account }: { client: ApiClient; account: Service
                     {new Date(k.created_on).toLocaleDateString()}
                   </td>
                   <td className="px-3 py-1.5 text-zinc-400 whitespace-nowrap">
-                    {k.last_used_on ? new Date(k.last_used_on).toLocaleString() : "never"}
+                    {k.last_used_on
+                      ? new Date(k.last_used_on).toLocaleString()
+                      : "never"}
                   </td>
                   <td className="px-3 py-1.5 text-zinc-400 whitespace-nowrap">
-                    {k.expires_on ? new Date(k.expires_on).toLocaleDateString() : "never"}
+                    {k.expires_on
+                      ? new Date(k.expires_on).toLocaleDateString()
+                      : "never"}
                   </td>
                   <td className="px-3 py-1.5">
                     {k.revoked ? (
@@ -554,7 +622,12 @@ function ApiKeysPanel({ client, account }: { client: ApiClient; account: Service
                     {!k.revoked && (
                       <button
                         onClick={async () => {
-                          if (!confirm(`Revoke key "${k.name}"? This cannot be undone.`)) return;
+                          if (
+                            !confirm(
+                              `Revoke key "${k.name}"? This cannot be undone.`,
+                            )
+                          )
+                            return;
                           try {
                             await client.revokeApiKey(account.id, k.id);
                             await refresh();
@@ -597,7 +670,11 @@ function CreateKeyForm({
   onSubmit,
 }: {
   accountRoles: string[];
-  onSubmit: (req: { name: string; scopes?: string[]; expires_on?: number | null }) => void;
+  onSubmit: (req: {
+    name: string;
+    scopes?: string[];
+    expires_on?: number | null;
+  }) => void;
 }) {
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<string[]>([]);
@@ -606,7 +683,7 @@ function CreateKeyForm({
   return (
     <div className="px-3 py-3 mb-3 rounded border border-zinc-800 bg-zinc-900/50 space-y-2">
       <input
-        autoFocus
+        autoFocus={canAutoFocus()}
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -629,7 +706,9 @@ function CreateKeyForm({
               <button
                 key={r}
                 onClick={() =>
-                  setScopes((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))
+                  setScopes((prev) =>
+                    on ? prev.filter((x) => x !== r) : [...prev, r],
+                  )
                 }
                 className={`text-[11px] px-1.5 py-0.5 rounded transition-colors ${
                   on
@@ -648,12 +727,17 @@ function CreateKeyForm({
         <select
           value={expirySecs === null ? "never" : String(expirySecs)}
           onChange={(e) =>
-            setExpirySecs(e.target.value === "never" ? null : Number(e.target.value))
+            setExpirySecs(
+              e.target.value === "never" ? null : Number(e.target.value),
+            )
           }
           className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
         >
           {EXPIRY_OPTIONS.map((o) => (
-            <option key={o.label} value={o.secs === null ? "never" : String(o.secs)}>
+            <option
+              key={o.label}
+              value={o.secs === null ? "never" : String(o.secs)}
+            >
               {o.label}
             </option>
           ))}
