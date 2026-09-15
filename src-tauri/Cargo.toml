@@ -1,0 +1,24 @@
+[package]
+name = "hammer-client"
+# Cosmetic — the bundle/app version comes from tauri.conf.json, which
+# reads ../package.json (bumped every commit).
+version = "0.21.0"
+edition = "2021"
+description = "Hammer — the Anvil DB desktop client"
+authors = ["Devforge Pty Ltd"]
+
+[lib]
+name = "hammer_client_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Keep this crate out of any cargo workspace above it.
+[workspace]

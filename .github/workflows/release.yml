@@ -1,0 +1,172 @@
+name: Release
+
+# Builds signed desktop installers for a v* tag and publishes them as a
+# GitHub Release on this repo.
+#
+# macOS signing/notarization and Windows signing (Azure Artifact Signing)
+# use the same repository secrets as the Foundry client:
+#   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID,
+#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (e.g. v0.21.40)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  client:
+    name: Client · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VERSION }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      # Windows code-signing CLI (Azure Artifact Signing). Only the Windows
+      # job needs it. Installs the `artifact-signing-cli` binary that
+      # signing.windows.conf.json invokes — keep those two names in step.
+      - name: Install signing CLI (Windows)
+        if: runner.os == 'Windows'
+        run: cargo install artifact-signing-cli
+
+      # artifact-signing-cli shells out to signtool.exe and az.cmd, and bails
+      # if either is missing. Its default signtool path pins ONE Windows SDK
+      # build, so discover the newest signtool present and pass it via
+      # SIGNTOOL_PATH. This also front-loads the diagnosis: Tauri swallows
+      # the sign command's stderr and reports only `failed to run
+      # artifact-signing-cli`.
+      - name: Locate signtool + Azure CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $kits = 'C:\Program Files (x86)\Windows Kits\10\bin'
+          $sdks = @(Get-ChildItem $kits -Directory -ErrorAction SilentlyContinue)
+          $best = $sdks |
+            Where-Object { ($_.Name -match '^\d+\.\d+\.\d+\.\d+$') -and (Test-Path (Join-Path $_.FullName 'x64\signtool.exe')) } |
+            Sort-Object -Property @{ Expression = { [version]$_.Name } } -Descending |
+            Select-Object -First 1
+          if (-not $best) {
+            Write-Host "No x64 signtool.exe under $kits. SDK dirs present:"
+            $sdks | ForEach-Object { Write-Host ("  " + $_.Name) }
+            throw 'signtool.exe not found - cannot sign.'
+          }
+          $signtool = Join-Path $best.FullName 'x64\signtool.exe'
+          Write-Host "signtool: $signtool"
+          "SIGNTOOL_PATH=$signtool" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $az = 'C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd'
+          if (-not (Test-Path $az)) {
+            $found = (Get-Command az.cmd -ErrorAction SilentlyContinue).Source
+            if (-not $found) { throw 'Azure CLI (az.cmd) not found - cannot sign.' }
+            $az = $found
+            "AZURE_CLI_PATH=$az" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+          Write-Host "az: $az"
+
+          # Proves the binary is installed and runnable before the bundler needs it.
+          artifact-signing-cli --version
+
+      # The Windows signCommand lives in an overlay config applied only here,
+      # so unsigned builds (ci.yml, PRs, local `npx tauri build`) don't fail
+      # looking for a signing tool they have no credentials for. The file is
+      # deliberately NOT named tauri.windows.conf.json — Tauri auto-merges
+      # that name into every Windows build.
+      #
+      # --verbose is load-bearing on Windows: when a sign command exits
+      # non-zero the bundler reports only `failed to run <program>` and drops
+      # the tool's stderr, which it logs at debug level.
+      - name: Build installers
+        env:
+          VITE_ANVIL_ALLOW_SERVER_ADD: "true"
+          # macOS signing + notarization (no-ops on Windows runners)
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows signing (Azure Artifact Signing; no-ops on macOS)
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: >-
+          npx tauri build ${{ runner.os == 'Windows' && '--verbose --config src-tauri/signing.windows.conf.json' || '' }}
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p installers
+          find src-tauri/target/release/bundle -type f \
+            \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) \
+            -exec cp {} installers/ \;
+          ls -la installers
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-${{ matrix.os }}
+          path: installers/*
+          compression-level: 0
+
+  publish:
+    name: Publish Release
+    needs: [client]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la assets
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Hammer ${{ env.VERSION }}
+          body: |
+            ## Hammer ${{ env.VERSION }}
+
+            The Anvil DB desktop client — the Hammer admin UI as an
+            installable app for macOS and Windows.
+
+            Grab the installer for your OS from the assets below:
+            **macOS** `.dmg` · **Windows** `.msi` / `.exe`.
+
+            On first launch, point it at your Anvil DB server (defaults to
+            `http://localhost:7474`; use the login screen's server picker
+            for remote instances).
+          files: assets/*

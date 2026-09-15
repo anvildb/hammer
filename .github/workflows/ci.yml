@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Web build — typecheck + the SSR bundle that hammer.anvildb.com serves.
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build (SSR)
+        run: npm run build
+
+  # The Tauri v2 desktop app — unsigned installers per OS to prove the
+  # native build stays green. Signing happens only in release.yml.
+  desktop:
+    name: Desktop · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      # `tauri build` runs `npm run build` (SPA mode via TAURI_ENV_*) then
+      # bundles native installers. The desktop client always allows adding
+      # servers — there is no fixed origin to derive one from.
+      - name: Build desktop app
+        env:
+          VITE_ANVIL_ALLOW_SERVER_ADD: "true"
+        run: npx tauri build
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: hammer-desktop-${{ matrix.os }}
+          path: |
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.exe
+          if-no-files-found: warn

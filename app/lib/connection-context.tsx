@@ -72,6 +72,12 @@ const ANVIL_PORT = "7474";
 function resolveBaseUrl(anvilApiUrl?: string): string {
   if (anvilApiUrl) return anvilApiUrl.replace(/\/$/, "");
   if (typeof window === "undefined") return "http://localhost:7474";
+  // Desktop (Tauri) builds run on a tauri:// origin — deriving a server
+  // from it is meaningless, so default to a local Anvil instance and let
+  // the login screen's server picker take it from there.
+  if (!window.location.protocol.startsWith("http")) {
+    return "http://localhost:7474";
+  }
   // Derive from current page: keep protocol (http/https), use Anvil's API port.
   return `${window.location.protocol}//${window.location.hostname}:${ANVIL_PORT}`;
 }

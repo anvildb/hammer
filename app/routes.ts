@@ -14,7 +14,12 @@ export default remixRoutesOptionAdapter((defineRoutes) => {
       // "client" in the filename, use the escape brackets like:
       // my-route.[server].tsx
       "**/*.server.*",
-      "**/*.client.*"
+      "**/*.client.*",
+      // Desktop (Tauri) builds are SPA mode, which forbids route loaders —
+      // and Chrome devtools discovery is meaningless inside a webview.
+      ...(process.env.TAURI_ENV_PLATFORM !== undefined
+        ? ["**/*devtools*"]
+        : [])
     ]
   });
 }) satisfies RouteConfig;
