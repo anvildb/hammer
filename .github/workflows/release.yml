@@ -45,6 +45,12 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Universal macOS build needs both arch targets so one .dmg runs on
+      # Intel and Apple Silicon.
+      - name: Add macOS targets
+        if: runner.os == 'macOS'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -121,15 +127,25 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         run: >-
-          npx tauri build ${{ runner.os == 'Windows' && '--verbose --config src-tauri/signing.windows.conf.json' || '' }}
+          npx tauri build ${{ runner.os == 'macOS' && '--target universal-apple-darwin' || '' }}${{ runner.os == 'Windows' && '--verbose --config src-tauri/signing.windows.conf.json' || '' }}
 
+      # Copy each installer under BOTH its versioned name (provenance) and a
+      # stable, version-independent alias, so
+      # github.com/<repo>/releases/latest/download/<stable> always resolves
+      # to the newest installer — the site links those directly.
       - name: Collect installers
         shell: bash
         run: |
           mkdir -p installers
-          find src-tauri/target/release/bundle -type f \
-            \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) \
-            -exec cp {} installers/ \;
+          copy_stable() {
+            find src-tauri/target -type f -name "$1" -print0 | while IFS= read -r -d '' f; do
+              cp "$f" installers/            # versioned original
+              cp "$f" "installers/$2"        # stable alias
+            done
+          }
+          copy_stable '*.dmg' 'Hammer-macos.dmg'
+          copy_stable '*.msi' 'Hammer-windows-x64.msi'
+          copy_stable '*-setup.exe' 'Hammer-windows-x64-setup.exe'
           ls -la installers
 
       - uses: actions/upload-artifact@v4
@@ -163,8 +179,10 @@ jobs:
             The Anvil DB desktop client — the Hammer admin UI as an
             installable app for macOS and Windows.
 
-            Grab the installer for your OS from the assets below:
-            **macOS** `.dmg` · **Windows** `.msi` / `.exe`.
+            Direct downloads (always the latest):
+            [macOS](https://github.com/anvildb/hammer/releases/latest/download/Hammer-macos.dmg)
+            · [Windows](https://github.com/anvildb/hammer/releases/latest/download/Hammer-windows-x64.msi).
+            The versioned assets for this specific release are below.
 
             On first launch, point it at your Anvil DB server (defaults to
             `http://localhost:7474`; use the login screen's server picker
