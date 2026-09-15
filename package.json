@@ -1,6 +1,6 @@
 {
   "name": "hammer",
-  "version": "0.21.38",
+  "version": "0.21.39",
   "description": "Web-based management UI for Anvil DB",
   "author": "Benjamin C. Tehan",
   "license": "MIT",
