@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- App Transport Security. Tauri merges this file into the macOS app's
+       Info.plist. Without an exception, WKWebView refuses to open any
+       http:// URL: in dev the webview never loads the plain-http dev
+       server (http://localhost:5175) and shows a black screen, and at
+       runtime the client can't reach a plain-http Anvil server.
+
+       - NSAllowsLocalNetworking: permit http to localhost / .local /
+         link-local — the dev server and a local `anvil start`.
+       - NSAllowsArbitraryLoadsInWebContent: Hammer is an admin client for
+         whatever Anvil server the user points it at, including plain-http
+         LAN instances, so the webview's own fetches must not be blocked by
+         ATS. (Not App Store distributed — Developer ID only.) -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsInWebContent</key>
+    <true/>
+  </dict>
+</dict>
+</plist>
