@@ -173,6 +173,10 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: Hammer ${{ env.VERSION }}
+          # Full release (not a prerelease) and marked latest, so
+          # releases/latest/download/<stable-name> resolves to it.
+          prerelease: false
+          make_latest: true
           body: |
             ## Hammer ${{ env.VERSION }}
 
