@@ -1432,7 +1432,7 @@ dependencies = [
 
 [[package]]
 name = "hammer-client"
-version = "0.21.40"
+version = "0.21.0"
 dependencies = [
  "serde",
  "serde_json",
