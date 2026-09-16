@@ -8,6 +8,16 @@ interface Props {
 }
 
 /**
+ * Keys whose value is a confidential credential: the server masks them as
+ * "********" in listings, so the UI uses a password input and starts the edit
+ * draft blank (never re-saving the mask). Mirrors `is_secret_setting_key`
+ * server-side.
+ */
+function isSecretKey(key: string): boolean {
+  return key.endsWith("smtp_pass") || key.endsWith("client_secret");
+}
+
+/**
  * App-scoped settings (APPS.md Phase 3): each key shows its effective value
  * and whether it is overridden for this app or inherited from the server.
  */
@@ -116,7 +126,7 @@ export function AppSettings({ client, appId }: Props) {
                           if (ev.key === "Enter") save(e.key);
                           if (ev.key === "Escape") setEditing(null);
                         }}
-                        type={e.key.endsWith("smtp_pass") ? "password" : "text"}
+                        type={isSecretKey(e.key) ? "password" : "text"}
                         className="w-full bg-zinc-800 text-zinc-200 rounded px-2 py-0.5 border border-zinc-600 focus:border-zinc-400 focus:outline-none"
                       />
                     ) : (
@@ -160,9 +170,7 @@ export function AppSettings({ client, appId }: Props) {
                         <button
                           onClick={() => {
                             setEditing(e.key);
-                            setDraft(
-                              e.key.endsWith("smtp_pass") ? "" : e.value,
-                            );
+                            setDraft(isSecretKey(e.key) ? "" : e.value);
                           }}
                           className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 hover:text-zinc-200"
                         >

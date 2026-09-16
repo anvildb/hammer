@@ -9,8 +9,9 @@ import type {
 import { appSchemaName } from "~/lib/connection-context";
 import { AppSettings } from "./app-settings";
 import { AppEmailTemplates } from "./app-email-templates";
+import { AppSocialLogin } from "./app-social-login";
 
-type Tab = "overview" | "members" | "labels" | "settings" | "email";
+type Tab = "overview" | "members" | "labels" | "settings" | "email" | "social";
 
 const PRIVILEGES: AppPrivilege[] = ["reader", "editor", "admin"];
 
@@ -40,6 +41,7 @@ export function AppDetail({
     { id: "labels", label: "Labels", adminOnly: false },
     { id: "settings", label: "Settings", adminOnly: true },
     { id: "email", label: "Email Templates", adminOnly: true },
+    { id: "social", label: "Social Login", adminOnly: true },
   ];
 
   return (
@@ -99,6 +101,9 @@ export function AppDetail({
         )}
         {tab === "email" && isAppAdmin && (
           <AppEmailTemplates client={client} appId={app.id} />
+        )}
+        {tab === "social" && isAppAdmin && (
+          <AppSocialLogin client={client} appId={app.id} />
         )}
       </div>
     </div>

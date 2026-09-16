@@ -45,9 +45,17 @@ interface ConnectionContextValue {
   apps: AppSummary[];
   refreshApps: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
-  otpRequest: (email: string) => Promise<{ message: string; expires_in_seconds: number }>;
+  otpRequest: (
+    email: string,
+  ) => Promise<{ message: string; expires_in_seconds: number }>;
   otpVerify: (email: string, code: string) => Promise<void>;
   resendVerification: (email: string) => Promise<{ message: string }>;
+  /** Social-login providers usable for the current server (discovery). */
+  oauthProviders: { linkedin: boolean };
+  /** Redirect the browser into a provider's OAuth flow. */
+  startOAuthLogin: (provider: "linkedin") => void;
+  /** Error carried back in the callback fragment, if the last attempt failed. */
+  oauthError: string | null;
   logout: () => void;
   clearMustChangePassword: () => void;
   /** True when VITE_ANVIL_ALLOW_SERVER_ADD lets visitors pick/add servers on the login page. */
@@ -104,6 +112,10 @@ export function ConnectionProvider({
   const [selectedSchema, setSelectedSchema] = useState<Schema>("public");
   const [apps, setApps] = useState<AppSummary[]>([]);
   const [savedServers, setSavedServers] = useState<SavedServer[]>([]);
+  const [oauthProviders, setOauthProviders] = useState<{ linkedin: boolean }>({
+    linkedin: false,
+  });
+  const [oauthError, setOauthError] = useState<string | null>(null);
   /** Name the visitor gave the not-yet-remembered server they added, if any. */
   const pendingNameRef = useRef<string | undefined>(undefined);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -132,7 +144,9 @@ export function ConnectionProvider({
           if (payload?.username) {
             setIsAuthenticated(true);
             setCurrentUser(String(payload.username));
-            setUserRoles(Array.isArray(payload.roles) ? (payload.roles as string[]) : []);
+            setUserRoles(
+              Array.isArray(payload.roles) ? (payload.roles as string[]) : [],
+            );
           }
         }
       }
@@ -229,7 +243,9 @@ export function ConnectionProvider({
       setCurrentUser(username);
       setMustChangePassword(result.mustChangePassword ?? false);
       const payload = parseJwtPayload(result.accessToken);
-      setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
+      setUserRoles(
+        Array.isArray(payload?.roles) ? (payload.roles as string[]) : [],
+      );
       rememberCurrentServer();
     },
     [client, rememberCurrentServer],
@@ -250,7 +266,9 @@ export function ConnectionProvider({
       setIsAuthenticated(true);
       const payload = parseJwtPayload(result.accessToken);
       setCurrentUser((payload?.username as string) ?? email.split("@")[0]);
-      setUserRoles(Array.isArray(payload?.roles) ? (payload.roles as string[]) : []);
+      setUserRoles(
+        Array.isArray(payload?.roles) ? (payload.roles as string[]) : [],
+      );
       setMustChangePassword(false);
       rememberCurrentServer();
     },
@@ -264,6 +282,104 @@ export function ConnectionProvider({
     [client],
   );
 
+  // Apply a token trio handed back by a social-login callback — the OAuth
+  // analogue of otpVerify's token-application (no client.login round-trip,
+  // so we set client.authToken ourselves, exactly as the restore path does).
+  const completeOAuthLogin = useCallback(
+    (tokens: {
+      accessToken: string;
+      idToken?: string;
+      refreshToken: string;
+    }) => {
+      client.authToken = tokens.accessToken;
+      client.refreshToken = tokens.refreshToken;
+      const stored = {
+        accessToken: tokens.accessToken,
+        idToken: tokens.idToken ?? "",
+        refreshToken: tokens.refreshToken,
+        mustChangePassword: false,
+      };
+      try {
+        localStorage.setItem(TOKENS_KEY, JSON.stringify(stored));
+      } catch {
+        // Ignore.
+      }
+      setIsAuthenticated(true);
+      const payload = parseJwtPayload(tokens.accessToken);
+      setCurrentUser((payload?.username as string) ?? null);
+      setUserRoles(
+        Array.isArray(payload?.roles) ? (payload.roles as string[]) : [],
+      );
+      setMustChangePassword(false);
+      rememberCurrentServer();
+    },
+    [client, rememberCurrentServer],
+  );
+
+  // Send the browser into the provider's authorize page. The callback comes
+  // back to *this* page URL with tokens in the fragment (read on mount below).
+  const startOAuthLogin = useCallback(
+    (provider: "linkedin") => {
+      if (typeof window === "undefined") return;
+      const redirect = window.location.origin + window.location.pathname;
+      const url = new URL(`${baseUrl}/auth/oauth/${provider}/start`);
+      url.searchParams.set("redirect", redirect);
+      window.location.assign(url.toString());
+    },
+    [baseUrl],
+  );
+
+  // Discover which social-login providers this server actually has configured,
+  // so the login screen only offers buttons that will work.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${baseUrl}/auth/oauth/providers`)
+      .then((r) => (r.ok ? r.json() : { linkedin: false }))
+      .then((p) => {
+        if (!cancelled) setOauthProviders({ linkedin: !!p?.linkedin });
+      })
+      .catch(() => {
+        if (!cancelled) setOauthProviders({ linkedin: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl]);
+
+  // On mount, complete a social login if we were redirected back with tokens
+  // (or an error) in the URL fragment, then scrub the fragment from the URL so
+  // the tokens don't linger in the address bar or a bookmark.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (hash.length < 2) return;
+    const params = new URLSearchParams(hash.slice(1));
+    const accessToken = params.get("accessToken");
+    const refreshToken = params.get("refreshToken");
+    const err = params.get("error");
+    const scrub = () =>
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    if (err) {
+      setOauthError(err);
+      scrub();
+      return;
+    }
+    if (accessToken && refreshToken) {
+      completeOAuthLogin({
+        accessToken,
+        idToken: params.get("idToken") ?? undefined,
+        refreshToken,
+      });
+      scrub();
+    }
+    // Mount-only: the fragment is consumed once, right after the redirect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const clearMustChangePassword = useCallback(() => {
     setMustChangePassword(false);
   }, []);
@@ -271,7 +387,9 @@ export function ConnectionProvider({
   const logout = useCallback(() => {
     // Delete the refresh token from the server to clean up the session.
     if (client.refreshToken) {
-      client.deleteDocument("auth.refresh_tokens", client.refreshToken).catch(() => {});
+      client
+        .deleteDocument("auth.refresh_tokens", client.refreshToken)
+        .catch(() => {});
     }
     client.authToken = undefined;
     client.refreshToken = undefined;
@@ -304,18 +422,16 @@ export function ConnectionProvider({
     [allowServerAdd, baseUrl],
   );
 
-  const removeSavedServer = useCallback(
-    (id: string) => {
-      setSavedServers((prev) => {
-        const removed = prev.find((s) => s.id === id);
-        const next = prev.filter((s) => s.id !== id);
-        saveSavedServers(next);
-        if (removed && loadActiveServerUrl() === removed.url) saveActiveServerUrl(null);
-        return next;
-      });
-    },
-    [],
-  );
+  const removeSavedServer = useCallback((id: string) => {
+    setSavedServers((prev) => {
+      const removed = prev.find((s) => s.id === id);
+      const next = prev.filter((s) => s.id !== id);
+      saveSavedServers(next);
+      if (removed && loadActiveServerUrl() === removed.url)
+        saveActiveServerUrl(null);
+      return next;
+    });
+  }, []);
 
   const isAdmin = userRoles.includes("admin");
 
@@ -367,6 +483,9 @@ export function ConnectionProvider({
         otpRequest,
         otpVerify,
         resendVerification,
+        oauthProviders,
+        startOAuthLogin,
+        oauthError,
         logout,
         clearMustChangePassword,
         allowServerAdd,

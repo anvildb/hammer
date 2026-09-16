@@ -7,8 +7,16 @@ type AuthTab = "password" | "email";
 type OtpStep = "request" | "verify";
 
 export function LoginScreen() {
-  const { login, otpRequest, otpVerify, resendVerification, status } =
-    useConnection();
+  const {
+    login,
+    otpRequest,
+    otpVerify,
+    resendVerification,
+    status,
+    oauthProviders,
+    startOAuthLogin,
+    oauthError,
+  } = useConnection();
   const [tab, setTab] = useState<AuthTab>("password");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -303,9 +311,42 @@ export function LoginScreen() {
             </form>
           )}
 
+          {/* Social login — shown only for providers the server has configured. */}
+          {oauthProviders.linkedin && (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-zinc-800" />
+                <span className="text-[11px] uppercase tracking-wide text-zinc-600">
+                  or
+                </span>
+                <div className="h-px flex-1 bg-zinc-800" />
+              </div>
+              <button
+                type="button"
+                onClick={() => startOAuthLogin("linkedin")}
+                disabled={status !== "connected"}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-[#0a66c2] hover:bg-[#0958a8] disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium rounded transition-colors"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="w-4 h-4 fill-current"
+                >
+                  <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+                </svg>
+                Continue with LinkedIn
+              </button>
+            </>
+          )}
+
           {/* Error / info messages */}
           {error && <p className="text-red-400 text-xs">{error}</p>}
           {info && <p className="text-blue-400 text-xs">{info}</p>}
+          {oauthError && (
+            <p className="text-red-400 text-xs">
+              Social login failed: {oauthError}
+            </p>
+          )}
 
           {/* Resend verification (shown when login fails due to unverified email) */}
           {error?.toLowerCase().includes("email not verified") && (
