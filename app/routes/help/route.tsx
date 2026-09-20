@@ -2217,10 +2217,14 @@ DROP APP 'crm' CASCADE                    -- detach-deletes the schema contents 
       <P>
         Pick <InlineCode>app_&lt;slug&gt;</InlineCode> in the schema dropdown (or send{" "}
         <InlineCode>X-Anvil-App: &lt;slug&gt;</InlineCode> / <InlineCode>database: "app_&lt;slug&gt;"</InlineCode>{" "}
-        from your own client). Inside the app you only see its nodes plus{" "}
-        <InlineCode>auth</InlineCode> identity nodes; labels must be bound before use;
-        relationships may not cross into another schema except to <InlineCode>:User</InlineCode>{" "}
-        / <InlineCode>:Role</InlineCode>; and <InlineCode>app_&lt;slug&gt;.*</InlineCode>{" "}
+        from your own client). Inside the app you only see data associated with it: its own
+        nodes plus the <InlineCode>:User</InlineCode> nodes of its <strong>members</strong> -
+        not every user on the server, and not the server-wide <InlineCode>:Role</InlineCode>{" "}
+        nodes (switch to the <InlineCode>auth</InlineCode> schema for those). That holds for
+        server admins too, and for every read: <InlineCode>MATCH</InlineCode>, traversals,
+        graph-document joins and full-text search. Labels must be bound before use;
+        relationships may not cross into another schema except to a member&apos;s{" "}
+        <InlineCode>:User</InlineCode>; and <InlineCode>app_&lt;slug&gt;.*</InlineCode>{" "}
         collections need editor+ to write and app admin to drop.
       </P>
 
@@ -2381,11 +2385,27 @@ curl -X POST http://localhost:7474/auth/service-accounts/$ID/keys \\
 curl http://localhost:7474/db/query \\
   -H "Authorization: Bearer anvil_sk_..." \\
   -d '{"query": "MATCH (n:Lead) RETURN n"}'`}</Code>
+      <P>
+        The same from Cypher, for server admins. Each statement runs the REST
+        handler it mirrors, so validation, app grants and audit events are
+        identical; the one-time secret comes back as a result row.
+      </P>
+      <Code>{`CREATE SERVICE ACCOUNT ci-bot ROLES admin APPS crm DESCRIPTION 'CI runner'
+CREATE SERVICE ACCOUNT sys-bot ROLES editor SERVICE_ROLE   -- server-wide
+CREATE API KEY deploy FOR ci-bot EXPIRES 30d               -- 30d | 12h | 45m | NEVER (default)
+CREATE API KEY ro FOR ci-bot SCOPES reader                 -- narrowed key
+SHOW SERVICE ACCOUNTS
+SHOW API KEYS FOR ci-bot                                   -- metadata only, never the secret
+SERVICE ACCOUNT ci-bot GRANT APP shop
+SERVICE ACCOUNT ci-bot REVOKE APP shop
+REVOKE API KEY deploy FOR ci-bot                           -- by name, or by key id
+DROP SERVICE ACCOUNT ci-bot                                -- keys and grants go with it`}</Code>
       <Table
         headers={["Capability", "Detail"]}
         rows={[
           ["Key prefix", "anvil_sk_ - the auth middleware uses this to distinguish keys from JWTs"],
-          ["Storage", "auth.service_accounts and auth.api_keys collections (admin-only writes)"],
+          ["Storage", "auth.service_accounts and auth.api_keys, protected by seeded admin-only RLS policies (select / insert / update / delete); like every auth.*, system.* and storage.* collection they are closed to non-admins on the Cypher document path too"],
+          ["Cypher DDL authorization", "Server admin AND allowed by those RLS policies - narrow a policy (with FORCE ROW LEVEL SECURITY, since admin otherwise bypasses RLS) and the statement is refused. App admins and app-scoped service accounts cannot run it"],
           ["Scopes", "Per-key allowlist; intersected with the account's roles at request time"],
           ["App scoping", "Without service_role, roles apply only inside the granted apps (auth.app_members rows keyed by the account id); a scoped key also caps the app privilege"],
           ["App-scoped surface", "/db/query (graph + document statements in its apps), /docs/app_<slug>.*, /apps/<slug>/* - everything else returns 403"],
