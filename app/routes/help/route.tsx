@@ -2352,10 +2352,23 @@ curl -X POST http://localhost:7474/auth/otp/verify \\
         can narrow that role set with a scope allowlist and may be revoked
         independently of the account.
       </P>
-      <Code>{`# Create the account
+      <P>
+        An account is either <strong>app-scoped</strong> or{" "}
+        <strong>server-wide</strong>. Without{" "}
+        <InlineCode>service_role</InlineCode> it is app-scoped: its roles are
+        its privilege inside the apps listed in <InlineCode>apps</InlineCode>{" "}
+        (the highest of reader / editor / admin) and nowhere else. An app-scoped{" "}
+        <InlineCode>admin</InlineCode> administers those apps - data, members,
+        settings, email templates - but is not a server admin: other apps, the
+        public / auth / system schemas, storage, functions and{" "}
+        <InlineCode>/admin/*</InlineCode> are all refused. With{" "}
+        <InlineCode>service_role</InlineCode> the account is server-wide and its
+        roles mean what they mean for a user.
+      </P>
+      <Code>{`# Create an account confined to the crm app, as its admin
 curl -X POST http://localhost:7474/auth/service-accounts \\
   -H "Authorization: Bearer $ADMIN_JWT" \\
-  -d '{"name": "ci-bot", "roles": ["editor"]}'
+  -d '{"name": "ci-bot", "roles": ["admin"], "apps": ["crm"]}'
 
 # Mint a key - the plaintext is returned ONCE, only stored as a hash after
 curl -X POST http://localhost:7474/auth/service-accounts/$ID/keys \\
@@ -2363,17 +2376,21 @@ curl -X POST http://localhost:7474/auth/service-accounts/$ID/keys \\
   -d '{"name": "github-actions"}'
 # => { "key": "anvil_sk_...", "key_id": "...", "prefix": "anvil_sk_xxxxxx" }
 
-# Use the key like any Bearer token
+# Use the key like any Bearer token. With one granted app the request runs in
+# that app's schema; with several, pick one with X-Anvil-App: <slug>.
 curl http://localhost:7474/db/query \\
   -H "Authorization: Bearer anvil_sk_..." \\
-  -d '{"query": "MATCH (n) RETURN n"}'`}</Code>
+  -d '{"query": "MATCH (n:Lead) RETURN n"}'`}</Code>
       <Table
         headers={["Capability", "Detail"]}
         rows={[
           ["Key prefix", "anvil_sk_ - the auth middleware uses this to distinguish keys from JWTs"],
           ["Storage", "auth.service_accounts and auth.api_keys collections (admin-only writes)"],
           ["Scopes", "Per-key allowlist; intersected with the account's roles at request time"],
-          ["service_role", "Capability flag that bypasses RLS when both the account and key scope allow it"],
+          ["App scoping", "Without service_role, roles apply only inside the granted apps (auth.app_members rows keyed by the account id); a scoped key also caps the app privilege"],
+          ["App-scoped surface", "/db/query (graph + document statements in its apps), /docs/app_<slug>.*, /apps/<slug>/* - everything else returns 403"],
+          ["service_role", "Makes the account server-wide and bypasses RLS when both the account and key scope allow it; cannot be combined with apps"],
+          ["Existing accounts", "Accounts created before app scoping stay server-wide until they are granted apps (flagged server-wide in Admin)"],
           ["Auditing", "AuthEvents emitted on create / use / revoke (prefix-only, never logs the secret)"],
           ["Throttled last-used", "last_used_on updates are coalesced to avoid write amplification"],
         ]}
@@ -2524,7 +2541,7 @@ function APISection() {
           ["POST", "/auth/service-accounts", "Create service account"],
           ["GET", "/auth/service-accounts", "List service accounts"],
           ["GET", "/auth/service-accounts/{id}", "Get one"],
-          ["PATCH", "/auth/service-accounts/{id}", "Update name / roles"],
+          ["PATCH", "/auth/service-accounts/{id}", "Update name / roles / granted apps"],
           ["DELETE", "/auth/service-accounts/{id}", "Delete account (revokes all keys)"],
           ["POST", "/auth/service-accounts/{id}/keys", "Mint a new API key (plaintext returned once)"],
           ["GET", "/auth/service-accounts/{id}/keys", "List keys for an account"],

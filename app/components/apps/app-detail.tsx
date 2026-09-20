@@ -470,12 +470,22 @@ function Members({
                     <span className="text-zinc-200">
                       {m.username || m.user_id}
                     </span>
+                    {m.kind === "service_account" && (
+                      <span
+                        title="Granted under Admin → Service Accounts"
+                        className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-900/30 text-sky-400"
+                      >
+                        service account
+                      </span>
+                    )}
                     <span className="ml-2 text-[10px] font-mono text-zinc-600">
                       {m.user_id}
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    {isAppAdmin ? (
+                    {/* A service account's privilege derives from its roles,
+                        so it is edited on the account, not here. */}
+                    {isAppAdmin && m.kind !== "service_account" ? (
                       <select
                         value={m.privilege}
                         onChange={async (e) => {
@@ -510,19 +520,21 @@ function Members({
                   </td>
                   {isAppAdmin && (
                     <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={async () => {
-                          try {
-                            await client.deleteAppMember(app.id, m.user_id);
-                            await refresh();
-                          } catch (err) {
-                            setError(String(err));
-                          }
-                        }}
-                        className="text-xs px-2 py-0.5 rounded bg-red-900/30 text-red-400 hover:bg-red-900/50"
-                      >
-                        Remove
-                      </button>
+                      {m.kind !== "service_account" && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await client.deleteAppMember(app.id, m.user_id);
+                              await refresh();
+                            } catch (err) {
+                              setError(String(err));
+                            }
+                          }}
+                          className="text-xs px-2 py-0.5 rounded bg-red-900/30 text-red-400 hover:bg-red-900/50"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </td>
                   )}
                 </tr>

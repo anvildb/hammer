@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { canAutoFocus } from "~/lib/utils";
 import type {
   ApiClient,
+  AppSummary,
   ServiceAccount,
   ApiKey,
   CreatedApiKey,
@@ -12,18 +13,45 @@ interface Props {
   availableRoles: string[];
 }
 
+// The roles that double as app privileges, lowest to highest. An app-scoped
+// account is granted its apps at the highest of these it holds.
+const APP_PRIVILEGE_ROLES = ["reader", "editor", "admin"] as const;
+
+function highestAppPrivilege(roles: string[]): string | null {
+  for (let i = APP_PRIVILEGE_ROLES.length - 1; i >= 0; i--) {
+    if (roles.includes(APP_PRIVILEGE_ROLES[i])) return APP_PRIVILEGE_ROLES[i];
+  }
+  return null;
+}
+
+/** Accounts created before app scoping: no service_role, yet server-wide. */
+function isLegacyServerWide(acc: ServiceAccount): boolean {
+  return !acc.app_scoped && !acc.service_role;
+}
+
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && [...a].sort().join() === [...b].sort().join();
+}
+
 export function ServiceAccountManagement({ client, availableRoles }: Props) {
   const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [apps, setApps] = useState<AppSummary[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setAccounts(await client.listServiceAccounts());
+      // Server admins see every app, which is what can be granted.
+      const [accts, appList] = await Promise.all([
+        client.listServiceAccounts(),
+        client.listApps(),
+      ]);
+      setAccounts(accts);
+      setApps(appList);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -59,6 +87,7 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
         {showCreate && (
           <CreateAccountForm
             availableRoles={availableRoles}
+            apps={apps}
             onSubmit={async (req) => {
               try {
                 const created = await client.createServiceAccount(req);
@@ -110,7 +139,32 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
                     service_role
                   </span>
                 )}
+                {isLegacyServerWide(acc) && (
+                  <span
+                    title="Created before app scoping: its roles apply to the whole server"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-400 shrink-0"
+                  >
+                    server-wide
+                  </span>
+                )}
               </div>
+              {acc.app_scoped && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {acc.apps.length === 0 && (
+                    <span className="text-[10px] text-zinc-600 italic">
+                      no apps granted
+                    </span>
+                  )}
+                  {acc.apps.map((g) => (
+                    <span
+                      key={g.app_id}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-sky-900/30 text-sky-400 font-mono"
+                    >
+                      {g.slug} · {g.privilege}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-wrap gap-1 mt-1">
                 {acc.roles.length === 0 && (
                   <span className="text-[10px] text-zinc-600 italic">
@@ -146,6 +200,7 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
             client={client}
             account={selected}
             availableRoles={availableRoles}
+            apps={apps}
             onChanged={async () => {
               await refresh();
             }}
@@ -168,22 +223,107 @@ export function ServiceAccountManagement({ client, availableRoles }: Props) {
 // Create account form
 // ---------------------------------------------------------------------------
 
+/**
+ * Pick the apps an app-scoped account is confined to. `roles` decides the
+ * privilege shown, since every granted app gets the account's highest role.
+ */
+function AppGrantPicker({
+  apps,
+  selected,
+  roles,
+  onChange,
+}: {
+  apps: AppSummary[];
+  selected: string[];
+  roles: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const privilege = highestAppPrivilege(roles);
+  return (
+    <div>
+      <p className="text-[11px] text-zinc-500 mb-1">Apps</p>
+      {apps.length === 0 ? (
+        <p className="text-[11px] text-zinc-600 italic">
+          No apps exist yet - create one under Apps first.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {apps.map((a) => {
+            const on = selected.includes(a.id);
+            return (
+              <button
+                key={a.id}
+                title={a.name}
+                onClick={() =>
+                  onChange(
+                    on ? selected.filter((x) => x !== a.id) : [...selected, a.id],
+                  )
+                }
+                className={`text-[11px] px-1.5 py-0.5 rounded font-mono transition-colors ${
+                  on
+                    ? "bg-sky-900/40 text-sky-300 border border-sky-700"
+                    : "bg-zinc-800 text-zinc-400 border border-transparent hover:text-zinc-200"
+                }`}
+              >
+                {a.slug}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-1.5 text-[11px] text-zinc-500 leading-snug">
+        {selected.length === 0 ? (
+          <>
+            With no app selected this account cannot access anything until it
+            is granted one.
+          </>
+        ) : privilege === null ? (
+          <span className="text-amber-400">
+            Select reader, editor or admin - it becomes the account&apos;s
+            privilege in the selected apps.
+          </span>
+        ) : privilege === "admin" ? (
+          <>
+            <span className="font-mono text-zinc-300">admin</span> of the
+            selected apps only: their data, members and settings. It is not a
+            server admin and cannot reach any other app or schema.
+          </>
+        ) : (
+          <>
+            <span className="font-mono text-zinc-300">{privilege}</span> in the
+            selected apps only. It cannot reach any other app or schema.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function CreateAccountForm({
   availableRoles,
+  apps,
   onSubmit,
 }: {
   availableRoles: string[];
+  apps: AppSummary[];
   onSubmit: (req: {
     name: string;
     description?: string;
     roles?: string[];
     service_role?: boolean;
+    apps?: string[];
   }) => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
   const [serviceRole, setServiceRole] = useState(false);
+  const [appIds, setAppIds] = useState<string[]>([]);
+
+  // Granting apps needs a role that names the privilege to grant.
+  const missingPrivilege =
+    !serviceRole && appIds.length > 0 && highestAppPrivilege(roles) === null;
+  const canSubmit = name.trim() !== "" && !missingPrivilege;
 
   return (
     <div className="px-3 py-3 border-b border-zinc-800 bg-zinc-900/50 space-y-2">
@@ -233,19 +373,34 @@ function CreateAccountForm({
           checked={serviceRole}
           onChange={(e) => setServiceRole(e.target.checked)}
         />
-        Grant <span className="font-mono">service_role</span> (bypasses RLS)
+        Grant <span className="font-mono">service_role</span> (server-wide,
+        bypasses RLS)
       </label>
+      {serviceRole ? (
+        <p className="text-[11px] text-amber-400/80 leading-snug">
+          Server-wide: the roles above apply to the entire server, so{" "}
+          <span className="font-mono">admin</span> here is a full server admin.
+        </p>
+      ) : (
+        <AppGrantPicker
+          apps={apps}
+          selected={appIds}
+          roles={roles}
+          onChange={setAppIds}
+        />
+      )}
       <button
         onClick={() => {
-          if (!name.trim()) return;
+          if (!canSubmit) return;
           onSubmit({
             name: name.trim(),
             description: description.trim() || undefined,
             roles,
             service_role: serviceRole,
+            apps: serviceRole ? [] : appIds,
           });
         }}
-        disabled={!name.trim()}
+        disabled={!canSubmit}
         className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded transition-colors"
       >
         Create Account
@@ -262,12 +417,14 @@ function AccountDetail({
   client,
   account,
   availableRoles,
+  apps,
   onChanged,
   onDeleted,
 }: {
   client: ApiClient;
   account: ServiceAccount;
   availableRoles: string[];
+  apps: AppSummary[];
   onChanged: () => Promise<void>;
   onDeleted: () => Promise<void>;
 }) {
@@ -276,6 +433,8 @@ function AccountDetail({
   const [editDescription, setEditDescription] = useState(account.description);
   const [editRoles, setEditRoles] = useState<string[]>(account.roles);
   const [editDisabled, setEditDisabled] = useState(account.disabled);
+  const grantedIds = account.apps.map((g) => g.app_id);
+  const [editApps, setEditApps] = useState<string[]>(grantedIds);
   const [error, setError] = useState<string | null>(null);
 
   // Re-seed the edit form whenever the selected account changes.
@@ -285,6 +444,7 @@ function AccountDetail({
     setEditDescription(account.description);
     setEditRoles(account.roles);
     setEditDisabled(account.disabled);
+    setEditApps(account.apps.map((g) => g.app_id));
     setError(null);
   }, [
     account.id,
@@ -292,7 +452,16 @@ function AccountDetail({
     account.description,
     account.disabled,
     account.roles,
+    account.apps,
   ]);
+
+  const appsChanged = !sameIds(editApps, grantedIds);
+  // Apps held (or about to be) need a role naming their privilege.
+  const missingPrivilege =
+    !account.service_role &&
+    editApps.length > 0 &&
+    (account.app_scoped || appsChanged) &&
+    highestAppPrivilege(editRoles) === null;
 
   return (
     <div className="p-6 space-y-6">
@@ -321,6 +490,49 @@ function AccountDetail({
           Created by <span className="text-zinc-400">{account.created_by}</span>{" "}
           on {new Date(account.created_on).toLocaleString()}
         </p>
+      </div>
+
+      {/* Access: how far this account's roles reach */}
+      <div>
+        <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+          Access
+        </h3>
+        {account.service_role ? (
+          <p className="text-xs text-zinc-400">
+            Server-wide. Its roles ({account.roles.join(", ") || "none"}) apply
+            to the entire server and it bypasses RLS.
+          </p>
+        ) : isLegacyServerWide(account) ? (
+          <p className="text-xs text-amber-400/90 leading-relaxed">
+            Server-wide. This account was created before app scoping, so its
+            roles ({account.roles.join(", ") || "none"}) still apply to the
+            entire server
+            {account.roles.includes("admin") && " - including full server admin"}
+            . Edit it and grant it apps to confine it to them.
+          </p>
+        ) : account.apps.length === 0 ? (
+          <p className="text-xs text-zinc-500 italic">
+            No apps granted - this account cannot access anything yet.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {account.apps.map((g) => (
+                <span
+                  key={g.app_id}
+                  title={g.name}
+                  className="text-[11px] px-2 py-0.5 rounded bg-sky-900/30 text-sky-300 font-mono"
+                >
+                  {g.slug} · {g.privilege}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-500">
+              Confined to these apps. It has no access to other apps, the
+              public schema, storage, or server administration.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Edit form */}
@@ -394,6 +606,20 @@ function AccountDetail({
               })}
             </div>
           </div>
+          {!account.service_role && (
+            <AppGrantPicker
+              apps={apps}
+              selected={editApps}
+              roles={editRoles}
+              onChange={setEditApps}
+            />
+          )}
+          {isLegacyServerWide(account) && appsChanged && (
+            <p className="text-[11px] text-amber-400/90 leading-snug">
+              Saving confines this account to the selected apps. Keys that rely
+              on its server-wide access will stop working outside them.
+            </p>
+          )}
           <label className="flex items-center gap-2 text-[11px] text-zinc-400 cursor-pointer">
             <input
               type="checkbox"
@@ -425,6 +651,7 @@ function AccountDetail({
                       editDisabled !== account.disabled
                         ? editDisabled
                         : undefined,
+                    apps: appsChanged ? editApps : undefined,
                   });
                   setEditing(false);
                   await onChanged();
@@ -432,7 +659,8 @@ function AccountDetail({
                   setError(String(e));
                 }
               }}
-              className="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white"
+              disabled={missingPrivilege}
+              className="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white"
             >
               Save
             </button>

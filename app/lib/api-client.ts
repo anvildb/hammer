@@ -290,6 +290,29 @@ export interface ServiceAccount {
   created_on: number;
   disabled: boolean;
   service_role: boolean;
+  /**
+   * True when the account is confined to `apps`: its roles are privileges
+   * inside those apps and it has no server-wide authority. False for a
+   * `service_role` account and for accounts created before app scoping.
+   */
+  app_scoped: boolean;
+  apps: ServiceAccountAppGrant[];
+}
+
+/**
+ * A server older than app scoping sends neither field; every account there is
+ * server-wide, which is exactly what the defaults say.
+ */
+function normalizeServiceAccount(a: ServiceAccount): ServiceAccount {
+  return { ...a, app_scoped: a.app_scoped ?? false, apps: a.apps ?? [] };
+}
+
+/** One app a service account has been granted, with its privilege there. */
+export interface ServiceAccountAppGrant {
+  app_id: string;
+  slug: string;
+  name: string;
+  privilege: AppPrivilege;
 }
 
 // -- Apps / projects (APPS.md) --
@@ -311,6 +334,8 @@ export interface AppMember {
   app_id: string;
   user_id: string;
   username: string;
+  /** What `user_id` refers to. Service accounts are managed under Admin. */
+  kind: "user" | "service_account";
   privilege: AppPrivilege;
   added_by: string;
   added_on: number;
@@ -508,11 +533,14 @@ export class ApiClient {
   // -- Service Accounts (admin) --
 
   async listServiceAccounts(): Promise<ServiceAccount[]> {
-    return this.get("/auth/service-accounts");
+    const accounts = await this.get<ServiceAccount[]>("/auth/service-accounts");
+    return accounts.map(normalizeServiceAccount);
   }
 
   async getServiceAccount(id: string): Promise<ServiceAccount> {
-    return this.get(`/auth/service-accounts/${encodeURIComponent(id)}`);
+    return normalizeServiceAccount(
+      await this.get(`/auth/service-accounts/${encodeURIComponent(id)}`),
+    );
   }
 
   async createServiceAccount(req: {
@@ -520,8 +548,12 @@ export class ApiClient {
     description?: string;
     roles?: string[];
     service_role?: boolean;
+    /** App ids or slugs; only for an account without `service_role`. */
+    apps?: string[];
   }): Promise<ServiceAccount> {
-    return this.post("/auth/service-accounts", req);
+    return normalizeServiceAccount(
+      await this.post("/auth/service-accounts", req),
+    );
   }
 
   async updateServiceAccount(
@@ -531,12 +563,16 @@ export class ApiClient {
       description?: string;
       roles?: string[];
       disabled?: boolean;
+      /** Replaces the granted apps (ids or slugs). */
+      apps?: string[];
     },
   ): Promise<ServiceAccount> {
-    return this.request(
-      "PATCH",
-      `/auth/service-accounts/${encodeURIComponent(id)}`,
-      patch,
+    return normalizeServiceAccount(
+      await this.request(
+        "PATCH",
+        `/auth/service-accounts/${encodeURIComponent(id)}`,
+        patch,
+      ),
     );
   }
 
