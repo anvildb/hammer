@@ -11,6 +11,9 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 
+/** Same title as the desktop window (src-tauri/tauri.conf.json). */
+export const meta: Route.MetaFunction = () => [{ title: "Hammer — Anvil DB" }];
+
 export function loader() {
   const allowFlag = (process.env.VITE_ANVIL_ALLOW_SERVER_ADD ?? "").toLowerCase();
   return {
