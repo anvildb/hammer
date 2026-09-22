@@ -1404,6 +1404,51 @@ SHOW HIDDEN PROPERTIES`}</Code>
         ]}
       />
 
+      <H2>Looking Beyond the Row</H2>
+      <P>
+        A predicate normally sees only the row in front of it and the session. Two forms
+        reach further - into another collection, or along a relationship - so a policy
+        can say &ldquo;only an admin of this row&rsquo;s organisation may edit it&rdquo; when the
+        membership is kept somewhere else. Inside either form, <InlineCode>d.field</InlineCode> / 
+        <InlineCode>n.field</InlineCode> is a property of the row being judged, which is what
+        joins the row to what is looked up.
+      </P>
+      <Code>{`-- Only an admin of this row's organisation may edit it; the membership lives elsewhere
+CREATE POLICY things_update ON COLLECTION app_crm.things FOR UPDATE
+  USING (EXISTS DOCUMENT IN app_crm.organization_user_roles
+           WHERE user_id = current_user() AND organization_id = d.organization_id AND role = 'admin')
+  WITH CHECK (EXISTS DOCUMENT IN app_crm.organization_user_roles
+           WHERE user_id = current_user() AND organization_id = d.organization_id AND role = 'admin')
+
+-- The same fact as a relationship
+CREATE POLICY thing_update ON :Thing FOR UPDATE
+  USING (EXISTS ((:User {id: current_user()})-[:ADMIN_OF]->(:Organization {id: n.organization_id})))`}</Code>
+      <Table
+        headers={["Form", "Meaning"]}
+        rows={[
+          [
+            "EXISTS DOCUMENT IN <collection> WHERE <field> = <expr> [AND ...]",
+            "Some document in the collection has every listed field equal to its expression. Use the registered name (app_x.things; unqualified means public). Fields are bare names of the looked-up document.",
+          ],
+          [
+            "EXISTS ((:Label {prop: <expr>})-[:TYPE]->(:Label {prop: <expr>}))",
+            "A relationship of TYPE runs from a node matching the left end to one matching the right end. Direction matters; one property per end.",
+          ],
+          ["<expr>", "A literal, current_user(), session('key'), or d.field / n.field of the row being judged."],
+        ]}
+      />
+      <P>
+        A lookup form is one term: to combine it with another condition, put it in parentheses, 
+        <InlineCode>(EXISTS DOCUMENT IN ... WHERE ...) OR d.public = true</InlineCode>. A row that
+        lacks the joined field is denied, as is a malformed form. Lookups bypass row-level
+        security themselves - it is the policy engine asking, not the caller - so the membership
+        row need not be readable by the person it is about, and a policy cannot recurse. Use 
+        <InlineCode>WITH CHECK</InlineCode> on updates or an admin could move a row into an
+        organisation they do not run. They work on the documents API and on every Cypher
+        statement that reads or writes under a policy; not on storage buckets. Each lookup runs
+        per candidate row and is memoised within the request.
+      </P>
+
       <H2>Write Enforcement</H2>
       <P>
         RLS policies are enforced on writes as well as reads. SET operations check the
@@ -2146,6 +2191,18 @@ CREATE POLICY no_secret ON :Document FOR SELECT TO reader
           ["session('key')", "Custom session variable (e.g., tenant_id)"],
         ]}
       />
+
+      <H2>Looking Beyond the Row</H2>
+      <P>
+        A predicate can also look into another collection or along a relationship: 
+        <InlineCode>EXISTS DOCUMENT IN app_crm.organization_user_roles WHERE user_id = current_user() AND organization_id = d.organization_id AND role = 'admin'</InlineCode> 
+        or <InlineCode>{"EXISTS ((:User {id: current_user()})-[:ADMIN_OF]->(:Organization {id: n.organization_id}))"}</InlineCode>,
+        where <InlineCode>d.field</InlineCode> / <InlineCode>n.field</InlineCode> is the row being
+        judged. That is how &ldquo;only an admin of this row&rsquo;s organisation may edit it&rdquo;
+        becomes a policy with the membership kept elsewhere. Parenthesise a lookup to combine it
+        with other conditions; a missing field or a malformed form denies; lookups are not
+        themselves subject to RLS. See the Cypher reference for the full rules.
+      </P>
 
       <H2>Write Enforcement</H2>
       <P>
