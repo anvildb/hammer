@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useConnection } from "~/lib/connection-context";
 import type { CypherResult, EventEntry } from "~/lib/api-client";
+import {
+  TargetFilter,
+  targetMatches,
+} from "~/components/filters/target-filter";
+import { Pager, usePager } from "~/components/table/pager";
 
 interface StoredTrigger {
   name: string;
@@ -40,6 +45,69 @@ function parseTriggers(result: CypherResult): StoredTrigger[] {
 
 type SortKey = "name" | "timing" | "event" | "target" | "priority";
 
+function BodyModal({
+  trigger,
+  onClose,
+}: {
+  trigger: StoredTrigger;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Trigger body: ${trigger.name}`}
+        className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-zinc-700">
+          <div className="min-w-0">
+            <h2 className="text-sm font-medium text-zinc-200 truncate">
+              Trigger body:{" "}
+              <span className="font-mono text-zinc-300">{trigger.name}</span>
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5 truncate">
+              <span className="font-mono">
+                {trigger.timing} {trigger.event} ON {trigger.target}
+              </span>
+              {" · "}Available variables:{" "}
+              {trigger.event === "INSERT"
+                ? "NEW"
+                : trigger.event === "DELETE"
+                  ? "OLD"
+                  : "OLD, NEW"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-zinc-500 hover:text-zinc-300 text-lg leading-none"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="p-4 overflow-y-auto">
+          <pre className="bg-zinc-950 border border-zinc-800 rounded p-3 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">
+            {trigger.body}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TriggersRoute() {
   const { client, status } = useConnection();
 
@@ -47,9 +115,10 @@ export default function TriggersRoute() {
   const [triggers, setTriggers] = useState<StoredTrigger[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [targetFilter, setTargetFilter] = useState("");
 
-  const sortedTriggers = useMemo(() => {
-    const list = [...triggers];
+  const visibleTriggers = useMemo(() => {
+    const list = triggers.filter((t) => targetMatches(t.target, targetFilter));
     list.sort((a, b) => {
       let cmp: number;
       if (sortBy === "priority") {
@@ -63,7 +132,12 @@ export default function TriggersRoute() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return list;
-  }, [triggers, sortBy, sortDir]);
+  }, [triggers, sortBy, sortDir, targetFilter]);
+  // A filter or sort change restarts at the first page.
+  const pager = usePager(
+    visibleTriggers,
+    `${targetFilter}\n${sortBy}\n${sortDir}`,
+  );
 
   const clickColumn = (key: SortKey) => {
     if (sortBy === key) {
@@ -90,8 +164,8 @@ export default function TriggersRoute() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Expanded body viewer
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  // Body viewer modal
+  const [bodyTrigger, setBodyTrigger] = useState<StoredTrigger | null>(null);
 
   // Activity log
   const [activityEvents, setActivityEvents] = useState<EventEntry[]>([]);
@@ -223,9 +297,23 @@ export default function TriggersRoute() {
       <div className="flex-1 p-6 space-y-8">
         {/* Trigger table */}
         <section>
-          <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3">
-            Registered Triggers
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
+              Registered Triggers
+            </h2>
+            {triggers.length > 0 && (
+              <div className="flex items-center gap-2">
+                <TargetFilter
+                  value={targetFilter}
+                  onValueChange={setTargetFilter}
+                  targets={triggers.map((t) => t.target)}
+                />
+                <span className="text-xs text-zinc-500 whitespace-nowrap">
+                  {visibleTriggers.length} of {triggers.length}
+                </span>
+              </div>
+            )}
+          </div>
           {loading && (
             <p className="text-sm text-zinc-500">Loading triggers...</p>
           )}
@@ -237,7 +325,12 @@ export default function TriggersRoute() {
           {!loading && !error && triggers.length === 0 && (
             <p className="text-sm text-zinc-500">No triggers defined yet.</p>
           )}
-          {!loading && triggers.length > 0 && (
+          {!loading && triggers.length > 0 && visibleTriggers.length === 0 && (
+            <p className="text-sm text-zinc-500">
+              No triggers match this target filter.
+            </p>
+          )}
+          {!loading && visibleTriggers.length > 0 && (
             <div className="overflow-x-auto rounded-md border border-zinc-800">
               <table className="w-full text-sm">
                 <thead>
@@ -348,7 +441,7 @@ export default function TriggersRoute() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedTriggers.map((t, i) => (
+                  {pager.pageRows.map((t, i) => (
                     <tr
                       key={`${t.name}-${i}`}
                       className={`border-b border-zinc-800/50 hover:bg-zinc-900/50 ${
@@ -427,12 +520,10 @@ export default function TriggersRoute() {
                       </td>
                       <td className="px-3 py-2 text-right space-x-1">
                         <button
-                          onClick={() =>
-                            setExpandedIdx(expandedIdx === i ? null : i)
-                          }
+                          onClick={() => setBodyTrigger(t)}
                           className="px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded transition-colors"
                         >
-                          {expandedIdx === i ? "Hide" : "Body"}
+                          Body
                         </button>
                         <button
                           onClick={() => handleToggle(t.name, t.enabled)}
@@ -455,30 +546,7 @@ export default function TriggersRoute() {
                   ))}
                 </tbody>
               </table>
-              {/* Expanded body viewer */}
-              {expandedIdx !== null && triggers[expandedIdx] && (
-                <div className="border-t border-zinc-800 bg-zinc-900/80 p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <p className="text-xs text-zinc-400">
-                      Trigger body:{" "}
-                      <span className="font-mono text-zinc-300">
-                        {triggers[expandedIdx].name}
-                      </span>
-                    </p>
-                    <span className="text-[10px] text-zinc-600">
-                      Available variables:{" "}
-                      {triggers[expandedIdx].event === "INSERT"
-                        ? "NEW"
-                        : triggers[expandedIdx].event === "DELETE"
-                          ? "OLD"
-                          : "OLD, NEW"}
-                    </span>
-                  </div>
-                  <pre className="bg-zinc-950 border border-zinc-800 rounded p-3 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">
-                    {triggers[expandedIdx].body}
-                  </pre>
-                </div>
-              )}
+              <Pager {...pager} />
             </div>
           )}
         </section>
@@ -843,6 +911,10 @@ export default function TriggersRoute() {
           </div>
         </section>
       </div>
+
+      {bodyTrigger && (
+        <BodyModal trigger={bodyTrigger} onClose={() => setBodyTrigger(null)} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useConnection } from "~/lib/connection-context";
 import type { CypherResult, EventEntry } from "~/lib/api-client";
+import { FilterBox, countedOptions } from "~/components/filters/filter-box";
+import { Pager, usePager } from "~/components/table/pager";
 
 interface StoredFunction {
   name: string;
@@ -36,6 +38,18 @@ function parseFunctions(result: CypherResult): StoredFunction[] {
   });
 }
 
+/** `name(x: STRING) RETURNS INT` -> `(x: STRING)`, for the name list. */
+function paramList(fn: StoredFunction): string {
+  return fn.signature
+    .replace(/^[^(]*/, "")
+    .replace(/\s+RETURNS\s+\S+$/, "");
+}
+
+type KindFilter = "all" | "read" | "mutating";
+
+const contains = (haystack: string, text: string) =>
+  haystack.toLowerCase().includes(text.trim().toLowerCase());
+
 export default function FunctionsRoute() {
   const { client, status, selectedSchema } = useConnection();
 
@@ -43,6 +57,47 @@ export default function FunctionsRoute() {
   const [functions, setFunctions] = useState<StoredFunction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [nameFilter, setNameFilter] = useState("");
+  const [returnsFilter, setReturnsFilter] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
+
+  const nameOptions = useMemo(
+    () => [
+      {
+        value: "Functions",
+        items: [...functions]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((fn) => ({ value: fn.name, hint: paramList(fn) })),
+      },
+    ],
+    [functions],
+  );
+  const returnsOptions = useMemo(
+    () => [
+      {
+        value: "Return types",
+        items: countedOptions(functions.map((fn) => fn.return_type)),
+      },
+    ],
+    [functions],
+  );
+
+  const visibleFunctions = useMemo(
+    () =>
+      functions.filter(
+        (fn) =>
+          contains(`${fn.name}${paramList(fn)}`, nameFilter) &&
+          contains(fn.return_type, returnsFilter) &&
+          (kindFilter === "all" ||
+            (kindFilter === "mutating") === fn.mutating),
+      ),
+    [functions, nameFilter, returnsFilter, kindFilter],
+  );
+  // A filter change restarts at the first page.
+  const pager = usePager(
+    visibleFunctions,
+    `${nameFilter}\n${returnsFilter}\n${kindFilter}`,
+  );
 
   // Create form
   const [formName, setFormName] = useState("");
@@ -61,8 +116,9 @@ export default function FunctionsRoute() {
   const [testError, setTestError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
 
-  // Expanded function body viewer
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  // Expanded function body viewer (by name: the row list is filtered)
+  const [expandedName, setExpandedName] = useState<string | null>(null);
+  const expandedFn = functions.find((fn) => fn.name === expandedName);
 
   // Call log
   const [callEvents, setCallEvents] = useState<EventEntry[]>([]);
@@ -185,9 +241,45 @@ export default function FunctionsRoute() {
       <div className="flex-1 p-6 space-y-8">
         {/* Function table */}
         <section>
-          <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3">
-            Registered Functions
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
+              Registered Functions
+            </h2>
+            {functions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <FilterBox
+                  value={nameFilter}
+                  onValueChange={setNameFilter}
+                  groups={nameOptions}
+                  match={(o, q) => contains(`${o.value}${o.hint ?? ""}`, q)}
+                  placeholder="Name or parameter"
+                  label="Filter by name"
+                  className="w-64"
+                />
+                <FilterBox
+                  value={returnsFilter}
+                  onValueChange={setReturnsFilter}
+                  groups={returnsOptions}
+                  placeholder="Returns"
+                  label="Filter by return type"
+                  className="w-36"
+                />
+                <select
+                  value={kindFilter}
+                  onChange={(e) => setKindFilter(e.target.value as KindFilter)}
+                  aria-label="Filter by kind"
+                  className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">Read and mutating</option>
+                  <option value="read">Read only</option>
+                  <option value="mutating">Mutating only</option>
+                </select>
+                <span className="text-xs text-zinc-500 whitespace-nowrap">
+                  {visibleFunctions.length} of {functions.length}
+                </span>
+              </div>
+            )}
+          </div>
           {loading && <p className="text-sm text-zinc-500">Loading functions...</p>}
           {error && (
             <div className="bg-red-900/30 border border-red-800 rounded-md p-3 text-red-300 text-sm mb-3">
@@ -197,7 +289,10 @@ export default function FunctionsRoute() {
           {!loading && !error && functions.length === 0 && (
             <p className="text-sm text-zinc-500">No functions defined yet.</p>
           )}
-          {!loading && functions.length > 0 && (
+          {!loading && functions.length > 0 && visibleFunctions.length === 0 && (
+            <p className="text-sm text-zinc-500">No functions match these filters.</p>
+          )}
+          {!loading && visibleFunctions.length > 0 && (
             <div className="overflow-x-auto rounded-md border border-zinc-800">
               <table className="w-full text-sm">
                 <thead>
@@ -221,7 +316,7 @@ export default function FunctionsRoute() {
                   </tr>
                 </thead>
                 <tbody>
-                  {functions.map((fn, i) => (
+                  {pager.pageRows.map((fn, i) => (
                     <tr
                       key={`${fn.name}-${i}`}
                       className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
@@ -247,10 +342,12 @@ export default function FunctionsRoute() {
                       </td>
                       <td className="px-3 py-2 text-right space-x-1">
                         <button
-                          onClick={() => setExpandedIdx(expandedIdx === i ? null : i)}
+                          onClick={() =>
+                            setExpandedName(expandedName === fn.name ? null : fn.name)
+                          }
                           className="px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded transition-colors"
                         >
-                          {expandedIdx === i ? "Hide" : "Body"}
+                          {expandedName === fn.name ? "Hide" : "Body"}
                         </button>
                         <button
                           onClick={() => handleTestFromList(fn)}
@@ -269,20 +366,21 @@ export default function FunctionsRoute() {
                   ))}
                 </tbody>
               </table>
-              {/* Expanded body viewer */}
-              {expandedIdx !== null && functions[expandedIdx] && (
+              {/* Expanded body viewer, for a row on this page */}
+              {expandedFn && pager.pageRows.includes(expandedFn) && (
                 <div className="border-t border-zinc-800 bg-zinc-900/80 p-4">
                   <p className="text-xs text-zinc-400 mb-2">
                     Function body:{" "}
                     <span className="font-mono text-zinc-300">
-                      {functions[expandedIdx].name}
+                      {expandedFn.name}
                     </span>
                   </p>
                   <pre className="bg-zinc-950 border border-zinc-800 rounded p-3 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">
-                    {functions[expandedIdx].body}
+                    {expandedFn.body}
                   </pre>
                 </div>
               )}
+              <Pager {...pager} />
             </div>
           )}
         </section>

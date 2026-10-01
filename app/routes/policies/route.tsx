@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useConnection } from "~/lib/connection-context";
 import type { CypherResult } from "~/lib/api-client";
+import {
+  TargetFilter,
+  targetMatches,
+} from "~/components/filters/target-filter";
+import { FilterBox, countedOptions } from "~/components/filters/filter-box";
+import { Pager, usePager } from "~/components/table/pager";
 
 interface Policy {
   name: string;
@@ -43,6 +49,52 @@ export default function PoliciesRoute() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [targetFilter, setTargetFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  // The server's roles, so the role list offers ones no policy names yet.
+  const [knownRoles, setKnownRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (status !== "connected") return;
+    let cancelled = false;
+    // Not an admin: the list is just the roles the policies name.
+    client
+      .listRoles()
+      .then((roles) => {
+        if (!cancelled) setKnownRoles(roles.map((r) => r.name));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [client, status]);
+
+  const roleOptions = useMemo(
+    () => [
+      {
+        value: "Roles",
+        items: countedOptions(
+          policies.map((p) => p.role),
+          knownRoles,
+        ),
+      },
+    ],
+    [policies, knownRoles],
+  );
+
+  const roleMatches = (role: string, text: string) =>
+    role.toLowerCase().includes(text.trim().toLowerCase());
+
+  const visiblePolicies = useMemo(
+    () =>
+      policies.filter(
+        (p) =>
+          targetMatches(p.target, targetFilter) &&
+          roleMatches(p.role, roleFilter),
+      ),
+    [policies, targetFilter, roleFilter],
+  );
+  const pager = usePager(visiblePolicies, `${targetFilter}\n${roleFilter}`);
 
   // Create form
   const [formName, setFormName] = useState("");
@@ -274,9 +326,32 @@ export default function PoliciesRoute() {
       <div className="flex-1 p-6 space-y-8">
         {/* Policy table */}
         <section>
-          <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3">
-            Active Policies
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
+              Active Policies
+            </h2>
+            {policies.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <TargetFilter
+                  value={targetFilter}
+                  onValueChange={setTargetFilter}
+                  targets={policies.map((p) => p.target)}
+                  relationships
+                />
+                <FilterBox
+                  value={roleFilter}
+                  onValueChange={setRoleFilter}
+                  groups={roleOptions}
+                  placeholder="Role"
+                  label="Filter by role"
+                  className="w-40"
+                />
+                <span className="text-xs text-zinc-500 whitespace-nowrap">
+                  {visiblePolicies.length} of {policies.length}
+                </span>
+              </div>
+            )}
+          </div>
           {loading && (
             <p className="text-sm text-zinc-500">Loading policies...</p>
           )}
@@ -288,7 +363,12 @@ export default function PoliciesRoute() {
           {!loading && !error && policies.length === 0 && (
             <p className="text-sm text-zinc-500">No policies defined yet.</p>
           )}
-          {!loading && policies.length > 0 && (
+          {!loading && policies.length > 0 && visiblePolicies.length === 0 && (
+            <p className="text-sm text-zinc-500">
+              No policies match these filters.
+            </p>
+          )}
+          {!loading && visiblePolicies.length > 0 && (
             <div className="overflow-x-auto rounded-md border border-zinc-800">
               <table className="w-full text-sm">
                 <thead>
@@ -318,7 +398,7 @@ export default function PoliciesRoute() {
                   </tr>
                 </thead>
                 <tbody>
-                  {policies.map((p, i) => (
+                  {pager.pageRows.map((p, i) => (
                     <tr
                       key={`${p.name}-${p.target}-${i}`}
                       className="border-b border-zinc-800/50 hover:bg-zinc-900/50"
@@ -364,6 +444,7 @@ export default function PoliciesRoute() {
                   ))}
                 </tbody>
               </table>
+              <Pager {...pager} />
             </div>
           )}
         </section>
