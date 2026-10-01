@@ -68,6 +68,19 @@ const SHOW_FUNCTIONS = {
   rowCount: 4,
 };
 
+// 40 calls of greet, newest first.
+const CALLS = Array.from({ length: 40 }, (_, i) => ({
+  id: 1000 - i,
+  timestamp: 1_700_000_000_000 - i * 1000,
+  type: "FunctionCalled",
+  name: "greet",
+  duration_ms: i,
+  success: true,
+  error: null,
+  user: "admin",
+  metadata: {},
+}));
+
 const json = (route: Route, body: unknown) =>
   route.fulfill({
     status: 200,
@@ -100,6 +113,15 @@ test.describe("Functions table filters", () => {
     );
     await page.route(`${MOCK_ORIGIN}/db/query`, (route) =>
       json(route, { ...functionSet, rowCount: functionSet.rows.length }),
+    );
+    // The call log asks for FunctionCalled and FunctionError events.
+    await page.route(
+      (url) => url.origin === MOCK_ORIGIN && url.pathname === "/admin/events",
+      (route) => {
+        const type = new URL(route.request().url()).searchParams.get("type");
+        const events = type === "FunctionCalled" ? CALLS : [];
+        json(route, { events, count: events.length, total: events.length });
+      },
     );
 
     await page.goto("/functions");
@@ -228,5 +250,20 @@ test.describe("Functions table filters", () => {
     await page.getByLabel("Rows per page").selectOption("10");
     await expect(rows).toHaveCount(10);
     await expect(page.getByText("Page 1 of 3")).toBeVisible();
+  });
+
+  test("the call log pages", async ({ page }) => {
+    await page.getByRole("button", { name: "Load Call Log" }).click();
+    // The table and its pager bar share the bordered wrapper.
+    const log = page.locator("table").nth(1).locator("..");
+    const rows = log.locator("tbody tr");
+    await expect(rows).toHaveCount(25);
+    await expect(log.getByText("(1–25 of 40)")).toBeVisible();
+    await log.getByRole("button", { name: "Next" }).click();
+    await expect(rows).toHaveCount(15);
+    await expect(rows.first()).toContainText("25ms");
+    // A reload starts over.
+    await page.getByRole("button", { name: "Load Call Log" }).click();
+    await expect(log.getByText("Page 1 of 2")).toBeVisible();
   });
 });

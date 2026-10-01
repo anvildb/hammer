@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 export const PAGE_SIZES = [10, 25, 50, 100];
 
 /**
- * Client-side paging over rows a page already holds in full. `resetKey`
- * changes (a filter edit, say) jump back to the first page; a refetch that
- * keeps the key leaves the reader where they were.
+ * Client-side paging over rows a page already holds in full. A `resetKey`
+ * change jumps back to the first page: pass the filters for a table whose
+ * rows are refetched in place (a drop keeps the page), or the rows array
+ * itself for a log that each load replaces outright.
  */
-export function usePager<T>(rows: T[], resetKey: string, defaultSize = 25) {
+export function usePager<T>(rows: T[], resetKey: unknown, defaultSize = 25) {
   const [pageSize, setPageSize] = useState(defaultSize);
   const [requestedPage, setPage] = useState(0);
   useEffect(() => {

@@ -46,6 +46,9 @@ function parseTriggers(result: CypherResult): StoredTrigger[] {
 
 type SortKey = "name" | "timing" | "event" | "target" | "priority";
 
+/** Newest firings (and, separately, errors) the activity log loads; it pages them client-side. */
+const ACTIVITY_LIMIT = 500;
+
 export default function TriggersRoute() {
   const { client, status } = useConnection();
 
@@ -115,6 +118,11 @@ export default function TriggersRoute() {
   const [depColumns, setDepColumns] = useState<string[]>([]);
   const [depLoading, setDepLoading] = useState(false);
 
+  // Each load replaces the log or the analysis outright, so it is its own
+  // reset key: a fresh load starts at page 1.
+  const activityPager = usePager(activityEvents, activityEvents);
+  const depPager = usePager(depRows, depRows);
+
   const fetchTriggers = useCallback(async () => {
     if (status !== "connected") return;
     try {
@@ -139,7 +147,7 @@ export default function TriggersRoute() {
     try {
       const params: { type?: string; name?: string; limit?: number } = {
         type: "TriggerFired",
-        limit: 50,
+        limit: ACTIVITY_LIMIT,
       };
       if (activityFilter.trim()) {
         params.name = activityFilter.trim();
@@ -152,7 +160,7 @@ export default function TriggersRoute() {
       const all = [...res.events, ...errRes.events].sort(
         (a, b) => b.timestamp - a.timestamp,
       );
-      setActivityEvents(all.slice(0, 50));
+      setActivityEvents(all.slice(0, ACTIVITY_LIMIT));
     } catch {
       // Silently fail - activity log is optional.
       setActivityEvents([]);
@@ -700,7 +708,7 @@ export default function TriggersRoute() {
                     </tr>
                   </thead>
                   <tbody>
-                    {activityEvents.map((evt) => (
+                    {activityPager.pageRows.map((evt) => (
                       <tr
                         key={evt.id}
                         className={`border-b border-zinc-800/50 hover:bg-zinc-900/50 ${
@@ -746,6 +754,7 @@ export default function TriggersRoute() {
                     ))}
                   </tbody>
                 </table>
+                <Pager {...activityPager} />
               </div>
             )}
 
@@ -810,7 +819,7 @@ export default function TriggersRoute() {
                     </tr>
                   </thead>
                   <tbody>
-                    {depRows.map((row, i) => {
+                    {depPager.pageRows.map((row, i) => {
                       const isWarning = Object.values(row).some((v) =>
                         v.startsWith("\u26a0"),
                       );
@@ -837,6 +846,7 @@ export default function TriggersRoute() {
                     })}
                   </tbody>
                 </table>
+                <Pager {...depPager} />
               </div>
             )}
 

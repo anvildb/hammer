@@ -48,6 +48,9 @@ function paramList(fn: StoredFunction): string {
 
 type KindFilter = "all" | "read" | "mutating";
 
+/** Newest calls (and, separately, errors) the call log loads; it pages them client-side. */
+const CALL_LOG_LIMIT = 500;
+
 const contains = (haystack: string, text: string) =>
   haystack.toLowerCase().includes(text.trim().toLowerCase());
 
@@ -123,6 +126,8 @@ export default function FunctionsRoute() {
   // Call log
   const [callEvents, setCallEvents] = useState<EventEntry[]>([]);
   const [callLogLoading, setCallLogLoading] = useState(false);
+  // Each load replaces the log outright, so it is its own reset key.
+  const callPager = usePager(callEvents, callEvents);
 
   const fetchFunctions = useCallback(async () => {
     if (status !== "connected") return;
@@ -147,12 +152,18 @@ export default function FunctionsRoute() {
     if (status !== "connected") return;
     setCallLogLoading(true);
     try {
-      const res = await client.events({ type: "FunctionCalled", limit: 50 });
-      const errRes = await client.events({ type: "FunctionError", limit: 50 });
+      const res = await client.events({
+        type: "FunctionCalled",
+        limit: CALL_LOG_LIMIT,
+      });
+      const errRes = await client.events({
+        type: "FunctionError",
+        limit: CALL_LOG_LIMIT,
+      });
       const all = [...res.events, ...errRes.events].sort(
         (a, b) => b.timestamp - a.timestamp
       );
-      setCallEvents(all.slice(0, 50));
+      setCallEvents(all.slice(0, CALL_LOG_LIMIT));
     } catch {
       setCallEvents([]);
     } finally {
@@ -567,7 +578,7 @@ export default function FunctionsRoute() {
                     </tr>
                   </thead>
                   <tbody>
-                    {callEvents.map((evt) => (
+                    {callPager.pageRows.map((evt) => (
                       <tr
                         key={evt.id}
                         className={`border-b border-zinc-800/50 hover:bg-zinc-900/50 ${
@@ -597,6 +608,7 @@ export default function FunctionsRoute() {
                     ))}
                   </tbody>
                 </table>
+                <Pager {...callPager} />
               </div>
             )}
 

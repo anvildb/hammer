@@ -73,6 +73,31 @@ const SHOW_TRIGGERS = {
   rowCount: 4,
 };
 
+// 60 firings of alpha_profile, newest first, and 30 dependency rows.
+const FIRINGS = Array.from({ length: 60 }, (_, i) => ({
+  id: 1000 - i,
+  timestamp: 1_700_000_000_000 - i * 1000,
+  type: "TriggerFired",
+  name: "alpha_profile",
+  duration_ms: i,
+  success: true,
+  error: null,
+  user: "admin",
+  metadata: {
+    timing: "BEFORE",
+    event: "INSERT",
+    target: "COLLECTION auth.users",
+  },
+}));
+const DEPENDENCIES = {
+  columns: ["source", "kind", "depends_on"],
+  rows: Array.from({ length: 30 }, (_, i) => [
+    `dep_${String(i).padStart(2, "0")}`,
+    "trigger",
+    "fn_x",
+  ]),
+};
+
 const json = (route: Route, body: unknown) =>
   route.fulfill({
     status: 200,
@@ -104,8 +129,23 @@ test.describe("Triggers body viewer", () => {
     await page.route(`${MOCK_ORIGIN}/`, (route) =>
       json(route, { name: "anvil", version: "0.0.0-test" }),
     );
-    await page.route(`${MOCK_ORIGIN}/db/query`, (route) =>
-      json(route, { ...triggerSet, rowCount: triggerSet.rows.length }),
+    await page.route(`${MOCK_ORIGIN}/db/query`, (route) => {
+      const { query } = route.request().postDataJSON() as { query: string };
+      json(
+        route,
+        query.startsWith("SHOW DEPENDENCIES")
+          ? { ...DEPENDENCIES, rowCount: DEPENDENCIES.rows.length }
+          : { ...triggerSet, rowCount: triggerSet.rows.length },
+      );
+    });
+    // The activity log asks for TriggerFired and TriggerError events.
+    await page.route(
+      (url) => url.origin === MOCK_ORIGIN && url.pathname === "/admin/events",
+      (route) => {
+        const type = new URL(route.request().url()).searchParams.get("type");
+        const events = type === "TriggerFired" ? FIRINGS : [];
+        json(route, { events, count: events.length, total: events.length });
+      },
     );
     // What the database has: `profiles` and `Invoice` carry no trigger, and
     // the `:User` trigger's label has no nodes, so it is missing here.
@@ -337,5 +377,34 @@ test.describe("Triggers body viewer", () => {
     await expect(page.getByText("20 of 40")).toBeVisible();
     await expect(page.getByText("Page 1 of 1")).toHaveCount(0);
     await expect(rows).toHaveCount(20);
+  });
+
+  test("the activity log and dependency analysis page too", async ({
+    page,
+  }) => {
+    // Activity: 60 firings, 25 a page; a reload starts over at page 1.
+    await page.getByRole("button", { name: "Load Activity" }).click();
+    // The table and its pager bar share the bordered wrapper.
+    const activity = page.locator("table").nth(1).locator("..");
+    const activityRows = activity.locator("tbody tr");
+    await expect(activityRows).toHaveCount(25);
+    await expect(activity.getByText("Page 1 of 3")).toBeVisible();
+    await activity.getByRole("button", { name: "Next" }).click();
+    await expect(activity.getByText("Page 2 of 3")).toBeVisible();
+    await expect(activityRows.first()).toContainText("25ms");
+    await page.getByRole("button", { name: "Load Activity" }).click();
+    await expect(activity.getByText("Page 1 of 3")).toBeVisible();
+    await expect(activityRows.first()).toContainText("0ms");
+
+    // Dependencies: 30 rows, so two pages; each table pages on its own.
+    await page.getByRole("button", { name: "Analyze Dependencies" }).click();
+    const deps = page.locator("table").nth(2).locator("..");
+    const depRows = deps.locator("tbody tr");
+    await expect(depRows).toHaveCount(25);
+    await expect(deps.getByText("(1–25 of 30)")).toBeVisible();
+    await deps.getByRole("button", { name: "Next" }).click();
+    await expect(depRows).toHaveCount(5);
+    await expect(depRows.first()).toContainText("dep_25");
+    await expect(activity.getByText("Page 1 of 3")).toBeVisible();
   });
 });
