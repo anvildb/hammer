@@ -159,24 +159,38 @@ test.describe("Functions table filters", () => {
     ).toBeVisible();
   });
 
-  test("the body panel follows the filtered rows", async ({ page }) => {
+  test("Body opens the function in a modal", async ({ page }) => {
     const rows = page.locator("table").first().locator("tbody tr");
+    const dialog = page.getByRole("dialog");
+    await rows
+      .filter({ hasText: "bump" })
+      .getByRole("button", { name: "Body" })
+      .click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Function body: bump");
+    await expect(dialog).toContainText(
+      "bump(id: INT, by: INT = 1) RETURNS INT · MUTATING",
+    );
+    await expect(dialog.locator("pre")).toHaveText("RETURN id + by");
+    await expect(dialog).toBeInViewport();
+    // The body lives in the modal only, not in a panel under the table.
+    await expect(page.locator("pre")).toHaveCount(1);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+
+    // A read function has no MUTATING tag; the backdrop closes it too.
     await rows
       .filter({ hasText: "greet" })
       .getByRole("button", { name: "Body" })
       .click();
-    await expect(page.locator("pre")).toHaveText("RETURN 'hi ' + name");
-
-    // Filtering greet out hides its body; bringing it back shows it again.
-    await page.getByLabel("Filter by name").fill("bump");
-    await expect(page.locator("pre")).toHaveCount(0);
-    await page.getByLabel("Filter by name").fill("");
-    await expect(page.locator("pre")).toHaveText("RETURN 'hi ' + name");
+    await expect(dialog).toContainText("greet(name: STRING) RETURNS STRING");
+    await expect(dialog).not.toContainText("MUTATING");
+    await page.mouse.click(5, 5);
+    await expect(dialog).toHaveCount(0);
   });
 
-  test("a long list pages, and an open body stays with its page", async ({
-    page,
-  }) => {
+  test("a long list pages", async ({ page }) => {
     functionSet.rows = Array.from({ length: 30 }, (_, i) => [
       `f${String(i).padStart(2, "0")}`,
       `f${String(i).padStart(2, "0")}() RETURNS INT`,
@@ -189,26 +203,30 @@ test.describe("Functions table filters", () => {
     await page.reload();
 
     const rows = page.locator("table").first().locator("tbody tr");
+    const names = () => rows.locator("td:first-child").allInnerTexts();
     await expect(rows).toHaveCount(25);
     await expect(page.getByText("Page 1 of 2")).toBeVisible();
 
-    await rows
-      .filter({ hasText: "f03" })
-      .getByRole("button", { name: "Body" })
-      .click();
-    await expect(page.locator("pre")).toHaveText("RETURN 3");
-
-    // The body belongs to page 1: gone on page 2, back on page 1.
     await page.getByRole("button", { name: "Next" }).click();
     await expect(rows).toHaveCount(5);
-    await expect(page.locator("pre")).toHaveCount(0);
-    await page.getByRole("button", { name: "Prev" }).click();
-    await expect(page.locator("pre")).toHaveText("RETURN 3");
+    expect((await names())[0]).toBe("f25");
 
-    // 10 per page: f03 is still on the first page.
+    // A page-2 row's body opens like any other.
+    await rows.first().getByRole("button", { name: "Body" }).click();
+    await expect(page.getByRole("dialog").locator("pre")).toHaveText(
+      "RETURN 25",
+    );
+    await page.keyboard.press("Escape");
+
+    // A filter edit restarts at page 1 of the narrowed list.
+    await page.getByLabel("Filter by name").fill("f2");
+    await expect(page.getByText("10 of 30")).toBeVisible();
+    await expect(page.getByText("Page 1 of 1")).toHaveCount(0);
+    expect((await names())[0]).toBe("f20");
+
+    await page.getByLabel("Filter by name").fill("");
     await page.getByLabel("Rows per page").selectOption("10");
     await expect(rows).toHaveCount(10);
     await expect(page.getByText("Page 1 of 3")).toBeVisible();
-    await expect(page.locator("pre")).toHaveText("RETURN 3");
   });
 });

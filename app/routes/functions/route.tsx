@@ -3,6 +3,7 @@ import { useConnection } from "~/lib/connection-context";
 import type { CypherResult, EventEntry } from "~/lib/api-client";
 import { FilterBox, countedOptions } from "~/components/filters/filter-box";
 import { Pager, usePager } from "~/components/table/pager";
+import { BodyModal } from "~/components/table/body-modal";
 
 interface StoredFunction {
   name: string;
@@ -116,9 +117,8 @@ export default function FunctionsRoute() {
   const [testError, setTestError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
 
-  // Expanded function body viewer (by name: the row list is filtered)
-  const [expandedName, setExpandedName] = useState<string | null>(null);
-  const expandedFn = functions.find((fn) => fn.name === expandedName);
+  // Body viewer modal
+  const [bodyFn, setBodyFn] = useState<StoredFunction | null>(null);
 
   // Call log
   const [callEvents, setCallEvents] = useState<EventEntry[]>([]);
@@ -342,12 +342,10 @@ export default function FunctionsRoute() {
                       </td>
                       <td className="px-3 py-2 text-right space-x-1">
                         <button
-                          onClick={() =>
-                            setExpandedName(expandedName === fn.name ? null : fn.name)
-                          }
+                          onClick={() => setBodyFn(fn)}
                           className="px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded transition-colors"
                         >
-                          {expandedName === fn.name ? "Hide" : "Body"}
+                          Body
                         </button>
                         <button
                           onClick={() => handleTestFromList(fn)}
@@ -366,20 +364,6 @@ export default function FunctionsRoute() {
                   ))}
                 </tbody>
               </table>
-              {/* Expanded body viewer, for a row on this page */}
-              {expandedFn && pager.pageRows.includes(expandedFn) && (
-                <div className="border-t border-zinc-800 bg-zinc-900/80 p-4">
-                  <p className="text-xs text-zinc-400 mb-2">
-                    Function body:{" "}
-                    <span className="font-mono text-zinc-300">
-                      {expandedFn.name}
-                    </span>
-                  </p>
-                  <pre className="bg-zinc-950 border border-zinc-800 rounded p-3 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">
-                    {expandedFn.body}
-                  </pre>
-                </div>
-              )}
               <Pager {...pager} />
             </div>
           )}
@@ -624,6 +608,21 @@ export default function FunctionsRoute() {
           </div>
         </section>
       </div>
+
+      {bodyFn && (
+        <BodyModal
+          kind="Function body"
+          name={bodyFn.name}
+          subtitle={
+            <>
+              <span className="font-mono">{bodyFn.signature}</span>
+              {bodyFn.mutating && " · MUTATING"}
+            </>
+          }
+          body={bodyFn.body}
+          onClose={() => setBodyFn(null)}
+        />
+      )}
     </div>
   );
 }

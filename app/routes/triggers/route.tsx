@@ -6,6 +6,7 @@ import {
   targetMatches,
 } from "~/components/filters/target-filter";
 import { Pager, usePager } from "~/components/table/pager";
+import { BodyModal } from "~/components/table/body-modal";
 
 interface StoredTrigger {
   name: string;
@@ -44,69 +45,6 @@ function parseTriggers(result: CypherResult): StoredTrigger[] {
 }
 
 type SortKey = "name" | "timing" | "event" | "target" | "priority";
-
-function BodyModal({
-  trigger,
-  onClose,
-}: {
-  trigger: StoredTrigger;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Trigger body: ${trigger.name}`}
-        className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-zinc-700">
-          <div className="min-w-0">
-            <h2 className="text-sm font-medium text-zinc-200 truncate">
-              Trigger body:{" "}
-              <span className="font-mono text-zinc-300">{trigger.name}</span>
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5 truncate">
-              <span className="font-mono">
-                {trigger.timing} {trigger.event} ON {trigger.target}
-              </span>
-              {" · "}Available variables:{" "}
-              {trigger.event === "INSERT"
-                ? "NEW"
-                : trigger.event === "DELETE"
-                  ? "OLD"
-                  : "OLD, NEW"}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="text-zinc-500 hover:text-zinc-300 text-lg leading-none"
-          >
-            &times;
-          </button>
-        </div>
-        <div className="p-4 overflow-y-auto">
-          <pre className="bg-zinc-950 border border-zinc-800 rounded p-3 font-mono text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap">
-            {trigger.body}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function TriggersRoute() {
   const { client, status } = useConnection();
@@ -913,7 +851,25 @@ export default function TriggersRoute() {
       </div>
 
       {bodyTrigger && (
-        <BodyModal trigger={bodyTrigger} onClose={() => setBodyTrigger(null)} />
+        <BodyModal
+          kind="Trigger body"
+          name={bodyTrigger.name}
+          subtitle={
+            <>
+              <span className="font-mono">
+                {bodyTrigger.timing} {bodyTrigger.event} ON {bodyTrigger.target}
+              </span>
+              {" · "}Available variables:{" "}
+              {bodyTrigger.event === "INSERT"
+                ? "NEW"
+                : bodyTrigger.event === "DELETE"
+                  ? "OLD"
+                  : "OLD, NEW"}
+            </>
+          }
+          body={bodyTrigger.body}
+          onClose={() => setBodyTrigger(null)}
+        />
       )}
     </div>
   );
