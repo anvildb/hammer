@@ -1380,13 +1380,20 @@ CREATE POLICY knows_policy ON :FRIEND FOR SELECT TO reader
       />
 
       <H2>Management</H2>
-      <Code>{`DROP POLICY name ON :Label
+      <Code>{`ALTER POLICY name ON :Label USING (predicate)         -- give USING, WITH CHECK or both; the other is kept
+ALTER POLICY name ON :Label WITH CHECK (predicate)
+DROP POLICY name ON :Label
 SHOW POLICIES
 SHOW POLICIES ON :Label
 ENABLE ROW LEVEL SECURITY ON :Label
 DISABLE ROW LEVEL SECURITY ON :Label
 FORCE ROW LEVEL SECURITY ON :Label
 SIMULATE POLICY AS alice WITH ROLE reader ON :Project
+
+-- A collection policy is addressed with ON COLLECTION wherever a label policy takes ON :Label
+ALTER POLICY things_update ON COLLECTION app_crm.things WITH CHECK (d.organization_id = session('org'))
+DROP POLICY things_update ON COLLECTION app_crm.things
+SHOW POLICIES ON COLLECTION app_crm.things
 
 -- Column-level security: hide properties from roles
 HIDE PROPERTY email ON :User FROM reader
@@ -2224,12 +2231,42 @@ CREATE POLICY no_secret ON :Document FOR SELECT TO reader
         applies to the paired collection too.
       </P>
 
+      <H2>Where Policies Apply</H2>
+      <P>
+        Collection policies run on the REST document API (get, query, scan, put, delete and
+        batch) and on the Cypher document statements. A document the caller may not see is{" "}
+        <InlineCode>404</InlineCode> over REST and simply absent from{" "}
+        <InlineCode>MATCH DOCUMENT</InlineCode> and the graph-document join; a write a policy
+        refuses is <InlineCode>403</InlineCode>. Rows are filtered before{" "}
+        <InlineCode>limit</InlineCode>, so a page is never short of rows the caller may see.
+        Upserting an existing document must pass <InlineCode>USING</InlineCode> on the row as
+        it is and <InlineCode>WITH CHECK</InlineCode> on its replacement;{" "}
+        <InlineCode>DELETE DOCUMENT</InlineCode> (key and WHERE forms) removes only what the
+        caller may see and delete; <InlineCode>UPSERT DOCUMENT ... WHERE ... SET</InlineCode>{" "}
+        leaves rows its UPDATE policies do not allow untouched. Label SELECT policies filter
+        every Cypher read of nodes: <InlineCode>MATCH</InlineCode>, traversals, counts,
+        full-text search and <InlineCode>OPTIONAL MATCH</InlineCode>.
+      </P>
+      <P>
+        Who is asking is settled once per request. Server admins bypass policies, app admins
+        bypass them inside their own app, and everyone else is judged by every role they
+        hold. <InlineCode>FORCE ROW LEVEL SECURITY</InlineCode> overrides both bypasses.{" "}
+        <InlineCode>TO authenticated</InlineCode> matches every signed-in principal and{" "}
+        <InlineCode>TO PUBLIC</InlineCode> everyone.
+      </P>
+
       <H2>Management</H2>
-      <Code>{`DROP POLICY name ON :Label
+      <Code>{`ALTER POLICY name ON :Label USING (predicate) [WITH CHECK (predicate)]   -- the predicate you leave out is kept
+DROP POLICY name ON :Label
 SHOW POLICIES
 SHOW POLICIES ON :Label
 ENABLE / DISABLE / FORCE ROW LEVEL SECURITY ON :Label
-SIMULATE POLICY AS alice WITH ROLE reader ON :Project`}</Code>
+SIMULATE POLICY AS alice WITH ROLE reader ON :Project
+
+-- Collection policies: ON COLLECTION name wherever a label policy takes ON :Label
+ALTER POLICY things_update ON COLLECTION app_crm.things WITH CHECK (...)
+DROP POLICY things_update ON COLLECTION app_crm.things
+SHOW POLICIES ON COLLECTION app_crm.things`}</Code>
     </>
   );
 }
@@ -2282,7 +2319,13 @@ DROP APP 'crm' CASCADE                    -- detach-deletes the schema contents 
         graph-document joins and full-text search. Labels must be bound before use;
         relationships may not cross into another schema except to a member&apos;s{" "}
         <InlineCode>:User</InlineCode>; and <InlineCode>app_&lt;slug&gt;.*</InlineCode>{" "}
-        collections need editor+ to write and app admin to drop.
+        collections need editor+ to write and app admin to drop. For REST document writes
+        under <InlineCode>/docs/app_&lt;slug&gt;.*</InlineCode> that editor is the caller&apos;s
+        privilege <em>in the app</em>, not their server role: someone who signed up through
+        OTP or OAuth holds only the server <InlineCode>reader</InlineCode> role, and an app
+        can still make them an editor of its documents. Schema DDL and Cypher writes keep
+        needing the server role. Row-level security applies on top, and app admins bypass
+        it inside their own app.
       </P>
 
       <H2>Settings & Email Templates</H2>
@@ -2298,7 +2341,10 @@ RESET SETTING 'app.crm.server.base_url'`}</Code>
         <InlineCode>password_reset</InlineCode> templates (with{" "}
         <InlineCode>{"{{app_name}}"}</InlineCode> / <InlineCode>{"{{app_slug}}"}</InlineCode>)
         are edited with a live preview on the Apps page; auth flows use them when the
-        request carries <InlineCode>"app": "&lt;slug&gt;"</InlineCode>.
+        request carries <InlineCode>"app": "&lt;slug&gt;"</InlineCode>. A login code
+        requested with an app remembers it, and that app&apos;s{" "}
+        <InlineCode>auth.allow_otp_registration</InlineCode> decides whether verifying the
+        code may register a new user.
       </P>
     </>
   );
@@ -2322,7 +2368,12 @@ function AuthSection() {
       <H2>Use the Token</H2>
       <Code>{`curl http://localhost:7474/db/query \\
   -H "Authorization: Bearer eyJ..." \\
-  -d '{"query": "MATCH (n) RETURN n"}'`}</Code>
+  -d '{"query": "MATCH (n) RETURN n"}'
+
+# Values travel in "params" and bind to $name - never spliced into the query text
+curl http://localhost:7474/db/query \\
+  -H "Authorization: Bearer eyJ..." \\
+  -d '{"query": "MATCH (l:Lead) WHERE l.name = $name RETURN l LIMIT $n", "params": {"name": "Acme", "n": 10}}'`}</Code>
 
       <H2>Register / Refresh / Change Password</H2>
       <Code>{`POST /auth/register   -- { username, password, email }
@@ -2349,9 +2400,10 @@ POST /auth/change-password -- { old_password, new_password }`}</Code>
         a 6-digit code sent to their inbox, then exchanges it for a JWT -
         same token shape as the password-login flow.
       </P>
-      <Code>{`# 1. Request a code (no auth required)
+      <Code>{`# 1. Request a code (no auth required). "app" is optional: the code then goes out
+#    with that app's templates and settings, and remembers the app.
 curl -X POST http://localhost:7474/auth/otp/request \\
-  -d '{"email":"alice@example.com"}'
+  -d '{"email":"alice@example.com", "app":"crm"}'
 # => { "expires_in_seconds": 300, "message": "If an account ... has been sent." }
 
 # 2. Exchange the code for a JWT
@@ -2363,7 +2415,7 @@ curl -X POST http://localhost:7474/auth/otp/verify \\
         rows={[
           ["auth.email.otp_ttl_secs", "300", "How long a code is valid"],
           ["auth.email.otp_max_attempts", "3", "Lockout after this many wrong codes for the same OTP"],
-          ["auth.allow_otp_registration", "false", "Auto-create a user when verify is called for an unknown email"],
+          ["auth.allow_otp_registration", "false", "Auto-create a user when verify is called for an unknown email. Scopable per app: a code requested with that app honours the app's value"],
         ]}
       />
 
@@ -2375,6 +2427,13 @@ curl -X POST http://localhost:7474/auth/otp/verify \\
         <InlineCode>email_verified: true</InlineCode>, and no password. Disabled
         by default - accidentally exposing a passwordless onboarding path to
         anyone with a working SMTP inbox is rarely what you want.
+      </P>
+      <P>
+        The flag is scopable per app (<InlineCode>SET SETTING
+        'app.crm.auth.allow_otp_registration' = 'true'</InlineCode> or the app&apos;s settings
+        API). A code requested with <InlineCode>"app": "crm"</InlineCode> registers a
+        first-time email when the server-wide flag <em>or</em> the app&apos;s effective flag
+        is on. The verify step takes no app field; it learns the app from the code.
       </P>
       <P>
         When the flag is off, an unknown-email verify returns the same{" "}
@@ -2465,7 +2524,7 @@ DROP SERVICE ACCOUNT ci-bot                                -- keys and grants go
           ["Cypher DDL authorization", "Server admin AND allowed by those RLS policies - narrow a policy (with FORCE ROW LEVEL SECURITY, since admin otherwise bypasses RLS) and the statement is refused. App admins and app-scoped service accounts cannot run it"],
           ["Scopes", "Per-key allowlist; intersected with the account's roles at request time"],
           ["App scoping", "Without service_role, roles apply only inside the granted apps (auth.app_members rows keyed by the account id); a scoped key also caps the app privilege"],
-          ["App-scoped surface", "/db/query (graph + document statements in its apps), /docs/app_<slug>.*, /apps/<slug>/* - everything else returns 403"],
+          ["App-scoped surface", "/db/query (graph + document statements in its apps), /docs/app_<slug>.*, /apps/<slug>/* - plus the object routes of its apps' buckets (Buckets under File Storage) - everything else returns 403"],
           ["service_role", "Makes the account server-wide and bypasses RLS when both the account and key scope allow it; cannot be combined with apps"],
           ["Existing accounts", "Accounts created before app scoping stay server-wide until they are granted apps (flagged server-wide in Admin)"],
           ["Auditing", "AuthEvents emitted on create / use / revoke (prefix-only, never logs the secret)"],
@@ -2586,7 +2645,7 @@ function APISection() {
         rows={[
           ["GET", "/", "Server info"],
           ["GET", "/health", "Health check"],
-          ["POST", "/db/query", "Execute Cypher query"],
+          ["POST", "/db/query", "Execute Cypher: { query, params?, database? }"],
           ["POST", "/db/import/cypher", "Import a Cypher script (admin/editor)"],
           ["GET", "/db/{name}/schema", "Get database schema"],
           ["GET", "/db/{name}/graph", "Get full graph data"],
@@ -3209,11 +3268,44 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" \\
   FILE_SIZE_LIMIT = 5242880,
   ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];`}</Code>
 
+      <H2>App Buckets</H2>
+      <P>
+        A bucket can belong to an app: pass <InlineCode>"app": "&lt;slug or id&gt;"</InlineCode>{" "}
+        when creating it over REST (the DDL has no APP clause) and the slug is stored and
+        returned as <InlineCode>app</InlineCode> on the bucket. It is fixed at creation. An
+        app-scoped service-account key of that app - one whose privilege in the app is
+        editor or admin - can then upload, download, list, delete and sign objects in the
+        bucket, and nothing else under <InlineCode>/storage</InlineCode>: it cannot create,
+        list or change buckets, its own included. A bucket it may not use answers{" "}
+        <InlineCode>403</InlineCode> whether it is missing, has no app or belongs to another
+        app. Give an app bucket a plain id; one that is also a route word (copy, move, list,
+        sign, upload, public, signed) is never reachable by an app key.
+      </P>
+      <Code>{`curl -X POST -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"id": "crm-files", "public": false, "app": "crm"}' \\
+  http://localhost:7474/storage/v1/bucket
+# => { "id": "crm-files", "app": "crm", ... }
+
+# With an app key of crm (editor or admin in the app):
+curl -X POST -H "Authorization: Bearer anvil_sk_..." \\
+  --data-binary @quote.pdf \\
+  http://localhost:7474/storage/v1/object/crm-files/quotes/q1.pdf`}</Code>
+      <Table
+        headers={["Route", "An app key may"]}
+        rows={[
+          ["POST / PUT / GET / HEAD / DELETE /storage/v1/object/{bucket}/{path}", "Upload, upsert, download (Range included), read metadata, delete"],
+          ["POST /storage/v1/object/list/{bucket}", "List"],
+          ["POST /storage/v1/object/sign/{bucket}/{path}", "Mint a signed download URL"],
+          ["POST /storage/v1/object/upload/sign/{bucket}/{path}", "Mint a signed upload URL"],
+        ]}
+      />
+
       <H2>REST surface</H2>
       <Table
         headers={["Method", "Path", "Use"]}
         rows={[
-          ["POST", "/storage/v1/bucket", "Create"],
+          ["POST", "/storage/v1/bucket", "Create (optional app: the bucket belongs to that app)"],
           ["GET", "/storage/v1/bucket", "List visible buckets"],
           ["GET", "/storage/v1/bucket/{id}", "Fetch one"],
           ["PUT", "/storage/v1/bucket/{id}", "Update settings"],
